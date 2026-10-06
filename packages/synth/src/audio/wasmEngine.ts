@@ -28,8 +28,8 @@ interface EngineExports {
   engine_describe_length(): number;
 }
 
-/** Play the arrangement from a slot, or loop one pattern. */
-export const PlayMode = { Song: 0, Pattern: 1 } as const;
+/** Play the arrangement from a slot, loop one pattern, or play from a slot to the end once. */
+export const PlayMode = { Song: 0, Pattern: 1, SongOnce: 2 } as const;
 export type PlayMode = (typeof PlayMode)[keyof typeof PlayMode];
 
 const SONG_ERRORS: Readonly<Record<number, string>> = {

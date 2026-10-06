@@ -83,9 +83,11 @@ worklet and the example songs from the site's root.
 
 The engine reports the playing arrangement slot and step; `timeline.ts` turns those
 into seconds, and turns a seek back into the slot it falls in, so seeking lands on a
-slot boundary. The engine loops a song, so the player stops it on its last step, lets
-the reverb and delay ring out, and starts the next. Pause suspends the AudioContext,
-which stops the engine mid-step and resumes it exactly there.
+slot boundary. It plays in the engine's `SongOnce` mode, which stops on the sample the
+step after the last would fire, so the last step plays out in full; the player then
+lets the reverb and delay ring out and starts the next song. Pause suspends the
+AudioContext, which stops the engine mid-step and resumes it exactly there, and holds
+what is left of a ring-out.
 
 ## Adding an instrument
 

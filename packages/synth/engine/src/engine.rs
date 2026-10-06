@@ -18,6 +18,8 @@ pub enum PlayMode {
     Song,
     /// Loops one pattern.
     Pattern,
+    /// Plays the arrangement from a slot once, stopping when its last step ends.
+    SongOnce,
 }
 
 /// A distinct, fixed noise seed per voice, so renders repeat exactly.
@@ -131,6 +133,9 @@ pub struct Engine {
     step: usize,
     /// Samples until the next step fires; fractional, so tempo never drifts.
     until_step: f64,
+    /// Set when `SongOnce` has fired the arrangement's last step: playing stops when
+    /// the next step would fire.
+    at_end: bool,
     position: Position,
     meters: [f32; METER_COUNT],
 }
@@ -172,6 +177,7 @@ impl Engine {
             slot: 0,
             step: 0,
             until_step: 0.0,
+            at_end: false,
             position: Position::default(),
             meters: [0.0; METER_COUNT],
         }
@@ -229,15 +235,18 @@ impl Engine {
 
     fn current_pattern(&self) -> usize {
         match self.mode {
-            PlayMode::Song => self.song.arrangement[self.slot],
+            PlayMode::Song | PlayMode::SongOnce => self.song.arrangement[self.slot],
             PlayMode::Pattern => self.pattern,
         }
     }
 
     fn point_at(&mut self, mode: PlayMode, index: usize) {
         self.mode = mode;
+        self.at_end = false;
         match mode {
-            PlayMode::Song => self.slot = index.min(self.song.arrangement.len() - 1),
+            PlayMode::Song | PlayMode::SongOnce => {
+                self.slot = index.min(self.song.arrangement.len() - 1)
+            }
             PlayMode::Pattern => self.pattern = index.min(self.song.patterns.len() - 1),
         }
     }
@@ -352,8 +361,12 @@ impl Engine {
         self.step += 1;
         if self.step >= steps {
             self.step = 0;
-            if self.mode == PlayMode::Song {
-                self.slot = (self.slot + 1) % self.song.arrangement.len();
+            let slots = self.song.arrangement.len();
+            match self.mode {
+                PlayMode::Song => self.slot = (self.slot + 1) % slots,
+                PlayMode::SongOnce if self.slot + 1 < slots => self.slot += 1,
+                PlayMode::SongOnce => self.at_end = true,
+                PlayMode::Pattern => {}
             }
         }
         duration
@@ -378,7 +391,11 @@ impl Engine {
         let mut offset = 0;
         while offset < frames {
             if self.playing && self.until_step <= 0.0 {
-                self.until_step += self.fire_step();
+                if self.at_end {
+                    self.stop();
+                } else {
+                    self.until_step += self.fire_step();
+                }
             }
             let mut length = frames - offset;
             if self.playing {
@@ -566,6 +583,28 @@ mod tests {
             engine.render(1024);
         }
         assert!(engine.output(0)[..1024].iter().all(|x| x.abs() < 1e-4));
+    }
+
+    #[test]
+    fn playing_once_stops_where_the_next_step_would_fire() {
+        // One 16-step bar at 174 BPM without swing.
+        let song: f64 = 16.0 * 48_000.0 * 60.0 / 174.0 / 4.0;
+        for block in [128, 441, 4096] {
+            let mut engine = engine_with(&four_on_the_floor());
+            engine.play(PlayMode::SongOnce, 0);
+            let mut rendered = 0;
+            let mut render_to = |engine: &mut Engine, end: usize| {
+                while rendered < end {
+                    rendered += engine.render(block.min(end - rendered));
+                }
+            };
+            render_to(&mut engine, song.floor() as usize);
+            assert!(engine.is_playing(), "block {block}");
+            render_to(&mut engine, song.ceil() as usize + 1);
+            assert!(!engine.is_playing(), "block {block}");
+            assert_eq!(engine.position().serial, 16, "block {block}");
+            assert_eq!(engine.position().step, 15, "block {block}");
+        }
     }
 
     #[test]

@@ -54,7 +54,15 @@ export class Player {
   private awaitingSlot: number | undefined;
   /** Where play starts from when stopped, after a seek while stopped. */
   private startSlot = 0;
-  private ending: ReturnType<typeof setTimeout> | undefined;
+  /** Whether the engine was told to play the current song since it last stopped. */
+  private started = false;
+  /**
+   * After a song ends, while its reverb and delay ring out before the next starts. The
+   * wait holds while paused, so it keeps what is left of it.
+   */
+  private tail:
+    | { remaining: number; since: number; timer: ReturnType<typeof setTimeout> | undefined }
+    | undefined;
   private seeking = false;
   private showRemaining = false;
 
@@ -262,9 +270,10 @@ export class Player {
    */
   async play(index?: number): Promise<void> {
     if (this.songs.length === 0) return;
-    if (index === undefined && this.state === "paused") {
+    if (index === undefined && this.state === "paused" && (this.started || this.tail)) {
       this.state = "playing";
       void this.host?.context.resume();
+      this.waitForTail();
       this.render();
       return;
     }
@@ -283,8 +292,7 @@ export class Player {
   }
 
   private start(host: EngineHost, slot: number): void {
-    clearTimeout(this.ending);
-    this.ending = undefined;
+    this.clearTail();
     const song = this.songs[this.current];
     if (!song) return;
     if (this.loaded !== this.current) {
@@ -293,25 +301,31 @@ export class Player {
     }
     this.awaitingSlot = slot;
     this.step = this.timelines[this.current]?.slotSteps[slot] ?? 0;
-    host.play(PlayMode.Song, slot);
+    this.started = true;
+    host.play(PlayMode.SongOnce, slot);
     this.startSlot = 0;
     this.render();
   }
 
+  /** Pauses, or resumes from a pause. */
   pause(): void {
-    if (this.state === "playing") {
+    if (this.state === "paused") {
+      void this.play();
+    } else if (this.state === "playing") {
       this.state = "paused";
       void this.host?.context.suspend();
-    } else if (this.state === "paused") {
-      this.state = "playing";
-      void this.host?.context.resume();
+      if (this.tail?.timer !== undefined) {
+        clearTimeout(this.tail.timer);
+        this.tail.timer = undefined;
+        this.tail.remaining -= performance.now() - this.tail.since;
+      }
+      this.render();
     }
-    this.render();
   }
 
   stop(): void {
-    clearTimeout(this.ending);
-    this.ending = undefined;
+    this.clearTail();
+    this.started = false;
     if (this.state === "paused") void this.host?.context.resume();
     this.host?.stop();
     this.state = "stopped";
@@ -373,28 +387,45 @@ export class Player {
   }
 
   private position(position: PlayingPosition): void {
-    if (this.state === "stopped" || this.ending !== undefined || !position.playing) return;
+    if (!this.started) return;
+    // Reports sent before the engine took the last play or seek are stale.
     if (this.awaitingSlot !== undefined) {
-      if (position.slot !== this.awaitingSlot || position.step !== 0) return;
+      if (!position.playing || position.slot !== this.awaitingSlot || position.step !== 0) return;
       this.awaitingSlot = undefined;
     }
     const line = this.timelines[this.current];
     if (!line) return;
-    this.step = stepAt(line, position.slot, position.step);
-    // The engine loops a song; stop it on its last step, so the next step never
-    // plays, and let it ring out before the next song.
-    if (this.step >= line.steps - 1) this.finish();
+    if (position.playing) {
+      this.step = stepAt(line, position.slot, position.step);
+    } else {
+      // The engine plays a song once, and stopped as its last step ended.
+      this.started = false;
+      this.step = line.steps;
+      this.tail = { remaining: TAIL_MS, since: 0, timer: undefined };
+      if (this.state === "playing") this.waitForTail();
+    }
     this.render();
   }
 
-  private finish(): void {
-    this.host?.stop();
-    this.ending = setTimeout(() => {
-      this.ending = undefined;
-      const next = this.playlist.next(this.current);
-      if (next === undefined) this.stop();
-      else void this.play(next);
-    }, TAIL_MS);
+  /** Lets what is left of the tail ring out, then moves on to the next song. */
+  private waitForTail(): void {
+    const tail = this.tail;
+    if (!tail || tail.timer !== undefined) return;
+    tail.since = performance.now();
+    tail.timer = setTimeout(
+      () => {
+        this.tail = undefined;
+        const next = this.playlist.next(this.current);
+        if (next === undefined) this.stop();
+        else void this.play(next);
+      },
+      Math.max(0, tail.remaining),
+    );
+  }
+
+  private clearTail(): void {
+    clearTimeout(this.tail?.timer);
+    this.tail = undefined;
   }
 
   private fail(message: string): void {
@@ -417,6 +448,7 @@ export class Player {
     const bars = line.steps / STEPS_PER_BAR;
     setText(this.details, `${song.bpm} bpm · ${bars} bars`);
     this.element.dataset["state"] = this.state;
+    this.element.toggleAttribute("data-ending", this.tail !== undefined);
     this.buttons.play.setAttribute("aria-pressed", String(this.state === "playing"));
     this.buttons.pause.setAttribute("aria-pressed", String(this.state === "paused"));
     this.buttons.shuffle.setAttribute("aria-pressed", String(this.playlist.shuffle));

@@ -18,10 +18,10 @@ use engine::{Engine, MAX_FRAMES, METER_COUNT, PlayMode};
 use instruments::InstrumentKind;
 
 fn mode(value: u32) -> PlayMode {
-    if value == 1 {
-        PlayMode::Pattern
-    } else {
-        PlayMode::Song
+    match value {
+        1 => PlayMode::Pattern,
+        2 => PlayMode::SongOnce,
+        _ => PlayMode::Song,
     }
 }
 
@@ -75,7 +75,8 @@ pub unsafe extern "C" fn engine_load_song(engine: *mut Engine) -> i32 {
     }
 }
 
-/// Plays from an arrangement slot (`mode` 0) or loops a pattern (`mode` 1).
+/// Plays from an arrangement slot (`mode` 0), loops a pattern (`mode` 1), or plays
+/// from an arrangement slot to the end once (`mode` 2).
 ///
 /// # Safety
 ///
