@@ -18,7 +18,10 @@ export interface DnbmOptions {
 }
 
 export interface DnbmInstance {
-  /** The app's frame. Its styles, audio engine and storage stay apart from the host's. */
+  /**
+   * The app's frame, which keeps its styles and scripts apart from the host page. Served
+   * from the host's origin, it shares that origin's local storage (see docs/package.md).
+   */
   readonly element: HTMLIFrameElement;
   /** Removes the app, releasing its document, audio context and event handlers. */
   destroy(): void;

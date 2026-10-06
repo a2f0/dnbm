@@ -42,13 +42,19 @@ const dnbm = mountDnbm(container, { assetsUrl: "/dnbm/" });
 dnbm.destroy();
 ```
 
-The app fills `container` through an iframe, which keeps its styles, audio engine
-and storage apart from the host's; give the container an explicit height. Audio
+The app fills `container` through an iframe, which keeps its styles and scripts apart
+from the host page; give the container an explicit height. Audio
 starts on the first gesture inside the frame, as browsers require. Embedding hides
 the dnbm wordmark, since the host names the app; pass `branding: true` to show it.
 `title` sets the frame's accessible title. Importing the module never touches the
 DOM, so server rendering and lazy loading are safe, and `destroy` releases the
 frame's document and audio context.
+
+The app autosaves the open song to local storage under `dnbm:song` and
+`dnbm:saved`. Storage belongs to an origin, not a frame: served from the host's own
+origin, as when copied into its static files, every embed on that origin shares one
+autosaved song, and the host's pages can read it. Serve the assets from an origin of
+their own to keep that storage apart.
 
 In a React component, an effect owns the lifecycle:
 
