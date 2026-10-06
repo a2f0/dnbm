@@ -3,6 +3,7 @@
 
 mod hat;
 mod kick;
+mod pad;
 mod perc;
 mod pluck;
 mod reese;
@@ -11,6 +12,7 @@ mod sub;
 
 pub use hat::Hat;
 pub use kick::Kick;
+pub use pad::Pad;
 pub use perc::Perc;
 pub use pluck::Pluck;
 pub use reese::Reese;
@@ -29,11 +31,12 @@ pub enum InstrumentKind {
     Sub,
     Reese,
     Pluck,
+    Pad,
 }
 
 impl InstrumentKind {
     /// In the order of their indices in a compiled song (web/src/song/instruments.ts).
-    pub const ALL: [InstrumentKind; 7] = [
+    pub const ALL: [InstrumentKind; 8] = [
         InstrumentKind::Kick,
         InstrumentKind::Snare,
         InstrumentKind::Hat,
@@ -41,6 +44,7 @@ impl InstrumentKind {
         InstrumentKind::Sub,
         InstrumentKind::Reese,
         InstrumentKind::Pluck,
+        InstrumentKind::Pad,
     ];
 
     pub fn from_index(index: usize) -> Option<Self> {
@@ -56,6 +60,7 @@ impl InstrumentKind {
             InstrumentKind::Sub => "sub",
             InstrumentKind::Reese => "reese",
             InstrumentKind::Pluck => "pluck",
+            InstrumentKind::Pad => "pad",
         }
     }
 
@@ -80,6 +85,18 @@ impl InstrumentKind {
                 "release",
             ],
             InstrumentKind::Pluck => &["tone", "decay", "release"],
+            InstrumentKind::Pad => &[
+                "cutoff",
+                "resonance",
+                "interval",
+                "detune",
+                "attack",
+                "env",
+                "decay",
+                "rate",
+                "sweep",
+                "release",
+            ],
         }
     }
 
@@ -87,14 +104,20 @@ impl InstrumentKind {
     pub fn is_melodic(self) -> bool {
         matches!(
             self,
-            InstrumentKind::Sub | InstrumentKind::Reese | InstrumentKind::Pluck
+            InstrumentKind::Sub
+                | InstrumentKind::Reese
+                | InstrumentKind::Pluck
+                | InstrumentKind::Pad
         )
     }
 
     /// Legato kinds are monophonic: a note played while another is held glides to it
     /// without retriggering.
     pub fn is_legato(self) -> bool {
-        matches!(self, InstrumentKind::Sub | InstrumentKind::Reese)
+        matches!(
+            self,
+            InstrumentKind::Sub | InstrumentKind::Reese | InstrumentKind::Pad
+        )
     }
 }
 
@@ -113,6 +136,7 @@ pub enum Voice {
     Sub(Sub),
     Reese(Reese),
     Pluck(Pluck),
+    Pad(Pad),
 }
 
 impl Voice {
@@ -125,6 +149,7 @@ impl Voice {
             InstrumentKind::Sub => Voice::Sub(Sub::new(sample_rate)),
             InstrumentKind::Reese => Voice::Reese(Reese::new(sample_rate, seed)),
             InstrumentKind::Pluck => Voice::Pluck(Pluck::new(sample_rate, seed)),
+            InstrumentKind::Pad => Voice::Pad(Pad::new(sample_rate, seed)),
         }
     }
 
@@ -137,6 +162,7 @@ impl Voice {
             Voice::Sub(_) => InstrumentKind::Sub,
             Voice::Reese(_) => InstrumentKind::Reese,
             Voice::Pluck(_) => InstrumentKind::Pluck,
+            Voice::Pad(_) => InstrumentKind::Pad,
         }
     }
 
@@ -149,6 +175,7 @@ impl Voice {
             Voice::Sub(v) => v.set_params(params),
             Voice::Reese(v) => v.set_params(params),
             Voice::Pluck(v) => v.set_params(params),
+            Voice::Pad(v) => v.set_params(params),
         }
     }
 
@@ -162,6 +189,7 @@ impl Voice {
             Voice::Sub(v) => v.trigger(velocity, note, legato),
             Voice::Reese(v) => v.trigger(velocity, note, legato),
             Voice::Pluck(v) => v.trigger(velocity, note),
+            Voice::Pad(v) => v.trigger(velocity, note, legato),
         }
     }
 
@@ -171,6 +199,7 @@ impl Voice {
             Voice::Sub(v) => v.release(),
             Voice::Reese(v) => v.release(),
             Voice::Pluck(v) => v.release(),
+            Voice::Pad(v) => v.release(),
             Voice::Kick(_) | Voice::Snare(_) | Voice::Hat(_) | Voice::Perc(_) => {}
         }
     }
@@ -185,6 +214,7 @@ impl Voice {
             Voice::Sub(v) => v.choke(),
             Voice::Reese(v) => v.choke(),
             Voice::Pluck(v) => v.choke(),
+            Voice::Pad(v) => v.choke(),
         }
     }
 
@@ -197,6 +227,7 @@ impl Voice {
             Voice::Sub(v) => v.is_active(),
             Voice::Reese(v) => v.is_active(),
             Voice::Pluck(v) => v.is_active(),
+            Voice::Pad(v) => v.is_active(),
         }
     }
 
@@ -210,6 +241,7 @@ impl Voice {
             Voice::Sub(v) => v.render(out),
             Voice::Reese(v) => v.render(out, context),
             Voice::Pluck(v) => v.render(out),
+            Voice::Pad(v) => v.render(out, context),
         }
     }
 }
@@ -239,7 +271,7 @@ mod tests {
 
     #[test]
     fn every_instrument_sounds_at_a_sane_level() {
-        let cases: [(InstrumentKind, &[f32]); 7] = [
+        let cases: [(InstrumentKind, &[f32]); 8] = [
             (InstrumentKind::Kick, &[48.0, 5.0, 0.035, 0.45, 0.35]),
             (InstrumentKind::Snare, &[185.0, 0.35, 0.22, 0.65]),
             (InstrumentKind::Hat, &[1.0, 0.06, 0.6]),
@@ -250,11 +282,76 @@ mod tests {
                 &[700.0, 0.3, 18.0, 0.4, 0.35, 0.3, 8.0, 0.2, 0.06, 0.15],
             ),
             (InstrumentKind::Pluck, &[0.45, 0.6, 0.08]),
+            (
+                InstrumentKind::Pad,
+                &[400.0, 0.25, 7.0, 12.0, 0.4, 0.2, 0.8, 32.0, 0.2, 0.6],
+            ),
         ];
         for (kind, params) in cases {
             assert_eq!(params.len(), kind.params().len(), "{kind:?}");
             let peak = peak(kind, params);
             assert!((0.15..=1.2).contains(&peak), "{kind:?} peaks at {peak}");
+        }
+    }
+
+    /// Triggers a voice, releases it, lets it fall silent and retriggers it, at fixed
+    /// samples, rendering in blocks of `block` samples.
+    fn retriggered(kind: InstrumentKind, params: &[f32], block: usize) -> Vec<f32> {
+        let sample_rate = 48_000.0;
+        let mut voice = Voice::new(kind, sample_rate, 1);
+        let mut values = [0.0; MAX_PARAMS];
+        values[..params.len()].copy_from_slice(params);
+        voice.set_params(&values);
+        let context = Context {
+            step_seconds: 0.086,
+        };
+        let mut out = vec![0.0; 32_768];
+        for (index, chunk) in out.chunks_mut(block).enumerate() {
+            match index * block {
+                0 => voice.trigger(1.0, 41.0, false),
+                4_096 => voice.release(),
+                24_576 => voice.trigger(1.0, 46.0, false),
+                _ => {}
+            }
+            voice.render(chunk, context);
+        }
+        out
+    }
+
+    #[test]
+    fn every_voice_renders_the_same_whatever_the_block_size() {
+        let cases: [(InstrumentKind, &[f32]); 8] = [
+            (InstrumentKind::Kick, &[48.0, 5.0, 0.035, 0.05, 0.35]),
+            (InstrumentKind::Snare, &[185.0, 0.35, 0.05, 0.65]),
+            (InstrumentKind::Hat, &[1.0, 0.03, 0.6]),
+            (InstrumentKind::Perc, &[420.0, 0.05, 0.3, 0.2]),
+            (InstrumentKind::Sub, &[0.03, 0.005, 0.01, 0.15]),
+            (
+                InstrumentKind::Reese,
+                &[700.0, 0.3, 18.0, 0.4, 0.35, 0.3, 8.0, 0.2, 0.06, 0.01],
+            ),
+            (InstrumentKind::Pluck, &[0.45, 0.1, 0.01]),
+            (
+                InstrumentKind::Pad,
+                &[400.0, 0.25, 7.0, 12.0, 0.01, 0.2, 0.8, 32.0, 0.2, 0.01],
+            ),
+        ];
+        for (kind, params) in cases {
+            let small = retriggered(kind, params, 128);
+            let large = retriggered(kind, params, 4_096);
+            // The voice fell silent before the retrigger, and came back.
+            assert!(
+                small[20_000..24_576].iter().all(|x| x.abs() < 1e-4),
+                "{kind:?} is still sounding"
+            );
+            assert!(
+                small[24_576..].iter().any(|x| x.abs() > 0.01),
+                "{kind:?} did not retrigger"
+            );
+            assert!(
+                small == large,
+                "{kind:?} renders differently per block size"
+            );
         }
     }
 

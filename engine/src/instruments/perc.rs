@@ -95,9 +95,12 @@ impl Perc {
             self.amp *= self.amp_multiplier;
             self.noise_env *= self.noise_multiplier;
             self.pitch *= self.pitch_multiplier;
-        }
-        if self.amp < 1e-4 || self.fade.is_silent() {
-            self.active = false;
+            // Stop on the sample the sound is spent, so the state its next trigger starts
+            // from never depends on where a block boundary fell.
+            if self.amp < 1e-4 || self.fade.is_silent() {
+                self.active = false;
+                break;
+            }
         }
     }
 }

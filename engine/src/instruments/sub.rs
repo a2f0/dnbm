@@ -87,6 +87,11 @@ impl Sub {
             let second = (self.phase * 2.0 * TAU).sin();
             let shaped = ((fundamental + self.warmth * 0.3 * second) * drive).tanh() * normalize;
             *o += shaped * 0.85 * self.envelope.tick() * self.gain * self.fade.tick();
+            // Stop on the sample the sound is spent, so the state its next trigger starts
+            // from never depends on where a block boundary fell.
+            if !self.is_active() {
+                break;
+            }
         }
     }
 }

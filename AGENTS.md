@@ -54,7 +54,9 @@ song with the same engine, for checking sound changes offline.
   never add volatile data (timestamps, random ids) to the format.
 - Instrument parameters are positional between `engine/src/instruments/mod.rs` and
   `web/src/song/instruments.ts`; change both together (see "Adding an instrument" in
-  `docs/architecture.md`). A format change bumps `FORMAT_VERSION` and needs a migration.
+  `docs/architecture.md`). Adding an instrument kind is additive and keeps the format
+  version, since every earlier song still reads the same way; a change to existing
+  fields bumps `FORMAT_VERSION` and needs a migration.
 - The engine is deterministic and its output never exceeds full scale; tests check both.
   Keep noise seeded, and keep the render path free of allocation (only song loads allocate).
 - `tsconfig.json` extends `@tsconfig/strictest`; index-signature access uses brackets

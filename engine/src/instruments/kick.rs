@@ -101,9 +101,12 @@ impl Kick {
             self.amp *= self.amp_multiplier;
             self.pitch *= self.pitch_multiplier;
             self.click_env *= self.click_multiplier;
-        }
-        if self.amp < 1e-4 || self.fade.is_silent() {
-            self.active = false;
+            // Stop on the sample the sound is spent, so the state its next trigger starts
+            // from never depends on where a block boundary fell.
+            if self.amp < 1e-4 || self.fade.is_silent() {
+                self.active = false;
+                break;
+            }
         }
     }
 }

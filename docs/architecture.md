@@ -32,8 +32,10 @@ and fails if the module imports anything.
   loop, a tempo-synced ping-pong delay, a soft-knee bus compressor, and a `tanh` clipper,
   so output never exceeds full scale.
 - **Determinism.** Noise comes from seeded xorshift generators and every start phase is
-  fixed, so a song renders to identical samples every time. `web/test/engine.test.ts`
-  checks this.
+  fixed, so a song renders to identical samples every time. A voice stops on the exact
+  sample it falls silent, so the state its next trigger starts from never depends on
+  where a block boundary fell. `web/test/engine.test.ts` and the instrument tests check
+  both.
 
 ## Songs into the engine
 

@@ -26,7 +26,11 @@ The editor opens on **Undertow**, a 172 BPM roller in F minor: syncopated sub an
 reese bass, dry backbeats, ghost snares and sparse, filtered dub echoes. Its 36 bars
 move from a short intro through four-bar variations, a half-time break and a heavier
 return. Press space to play. The browser restores your last session; choose
-Undertow from **examples** to reload the bundled song.
+Undertow from **examples** to reload the bundled song. The same menu holds ten
+darker songs, from Bathyal's slow pressure and Oubliette's bare cell to Corrosion's
+industrial grind and Sever's techstep cuts, each longer than Undertow and all built
+from the same synthesized kit: drones and stabs come from the `pad` instrument,
+detuned saw pairs an interval apart under a slow, resonant filter.
 
 Click an arrangement slot to start there, or choose **loop** to work on one pattern.
 **follow** keeps the grid on the playing pattern; selecting another pattern during

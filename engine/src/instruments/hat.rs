@@ -88,9 +88,12 @@ impl Hat {
             let high = self.high_pass.process(band).high;
             *o += high * 1.6 * self.amp * self.gain * self.fade.tick();
             self.amp *= self.amp_multiplier;
-        }
-        if self.amp < 1e-4 || self.fade.is_silent() {
-            self.active = false;
+            // Stop on the sample the sound is spent, so the state its next trigger starts
+            // from never depends on where a block boundary fell.
+            if self.amp < 1e-4 || self.fade.is_silent() {
+                self.active = false;
+                break;
+            }
         }
     }
 }
