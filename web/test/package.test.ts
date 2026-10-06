@@ -256,7 +256,11 @@ describe("the packaged app embedded in a cross-origin frame", () => {
 <div id="window" style="width:1200px;height:800px"></div>
 <script type="module">
   import { mountDnbm } from "/dnbm.js";
-  window.dnbm = mountDnbm(document.getElementById("window"), { assetsUrl: "${new URL("/dnbm/", assetServer.url).href}" });
+  window.remount = () => {
+    window.dnbm?.destroy();
+    window.dnbm = mountDnbm(document.getElementById("window"), { assetsUrl: "${new URL("/dnbm/", assetServer.url).href}" });
+  };
+  window.remount();
 </script>`,
     );
     const hostServer = serveDirectory(host, "127.0.0.1");
@@ -307,6 +311,22 @@ describe("the packaged app embedded in a cross-origin frame", () => {
       frame.click('button:text-is("save")'),
     ]);
     expect(download.suggestedFilename()).toBe("untitled.dnbm.json");
+  }, 20_000);
+
+  test("keeps an edit made just before the host destroys and remounts the app", async () => {
+    await frame.fill(".title", "Night Bus");
+    // Commit the edit, then destroy and remount at once: milliseconds, not the
+    // hundreds a delayed autosave would need.
+    await frame.evaluate(() =>
+      document.querySelector(".title")?.dispatchEvent(new Event("change")),
+    );
+    await page.evaluate(() => (window as unknown as { remount(): void }).remount());
+    const element = await page.waitForSelector("iframe");
+    const content = await element.contentFrame();
+    if (!content) throw new Error("the iframe has no content frame");
+    frame = content;
+    await frame.waitForSelector(".cell");
+    expect(await frame.inputValue(".title")).toBe("Night Bus");
   }, 20_000);
 
   test("destroy removes the frame", async () => {

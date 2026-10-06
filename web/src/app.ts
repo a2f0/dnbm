@@ -21,7 +21,6 @@ import type { View } from "./view";
 
 export const AUTOSAVE_KEY = "dnbm:song";
 export const SAVED_KEY = "dnbm:saved";
-const AUTOSAVE_DELAY = 400;
 
 /** Reads browser storage, which can throw (private windows, blocked storage). */
 export function readStorage(key: string): string | null {
@@ -46,7 +45,6 @@ export class App {
   private host: EngineHost | undefined;
   private starting: Promise<EngineHost | undefined> | undefined;
   private syncQueued = false;
-  private autosaveTimer: ReturnType<typeof setTimeout> | undefined;
   private fileHandle: FileSystemFileHandle | undefined;
   private fileName: string | undefined;
   private readonly transport: Transport;
@@ -154,7 +152,7 @@ export class App {
     view.startSlot = Math.min(view.startSlot, song.arrangement.length - 1);
     if (source === "load") view.cursor = undefined;
     this.queueSync();
-    this.queueAutosave();
+    this.autosave();
     this.render();
   }
 
@@ -179,12 +177,13 @@ export class App {
     });
   }
 
-  private queueAutosave(): void {
-    clearTimeout(this.autosaveTimer);
-    this.autosaveTimer = setTimeout(() => {
-      writeStorage(AUTOSAVE_KEY, serializeSong(this.song));
-      writeStorage(SAVED_KEY, this.store.saved);
-    }, AUTOSAVE_DELAY);
+  /**
+   * Saves the song to local storage on every change, never later: an embedding host
+   * can remove the app's frame at any moment, and a delayed write would be lost.
+   */
+  private autosave(): void {
+    writeStorage(AUTOSAVE_KEY, serializeSong(this.song));
+    writeStorage(SAVED_KEY, this.store.saved);
   }
 
   /** Starts the audio engine on first use; browsers only allow it after a gesture. */
@@ -349,7 +348,7 @@ export class App {
       this.fileHandle = handle;
       this.fileName = handle?.name ?? name;
       this.store.markSaved(text);
-      this.queueAutosave();
+      this.autosave();
       this.render();
       this.say(handle ? `Saved ${this.fileName}.` : `Downloaded ${name}.`);
     } catch (error) {
