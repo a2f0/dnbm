@@ -138,7 +138,7 @@ input {
 }
 
 .title {
-  width: 22ch;
+  width: 16ch;
   border-color: transparent;
   background: transparent;
 }
@@ -212,9 +212,11 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
+/* The scope gives up width first, so the bar stays on one line in a window. */
 .scope {
-  flex: none;
-  width: 168px;
+  flex: 1 1 64px;
+  min-width: 64px;
+  max-width: 168px;
   height: 30px;
   border: 1px solid var(--line);
   border-radius: 3px;
@@ -827,7 +829,18 @@ input {
   text-overflow: ellipsis;
 }
 
-@media (max-width: 900px) {
+/* A short frame, such as a small window, keeps the desktop arrangement and scrolls,
+   rather than squeezing the grid. */
+@media (max-height: 760px) {
+  .app {
+    grid-template-rows: auto;
+    height: auto;
+    min-height: 100dvh;
+  }
+}
+
+/* Narrow screens stack the panels. */
+@media (max-width: 720px) {
   .app {
     grid-template-rows: auto;
     height: auto;
