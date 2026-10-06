@@ -55,6 +55,7 @@ export class ParamControl {
         "aria-label": label,
         "aria-valuemin": spec.min,
         "aria-valuemax": spec.max,
+        "aria-orientation": "vertical",
         title: `${label}: drag or scroll, double-click to reset`,
       },
       [],
@@ -165,6 +166,7 @@ export class ParamControl {
     };
     this.element.addEventListener("pointerup", end);
     this.element.addEventListener("pointercancel", end);
+    this.element.addEventListener("lostpointercapture", end);
     this.element.addEventListener(
       "wheel",
       (event) => {

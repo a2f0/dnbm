@@ -15,6 +15,8 @@ export class PatternBar {
   private readonly bars: HTMLButtonElement[];
   private readonly chips: HTMLElement;
   private readonly arrangementInput: HTMLInputElement;
+  private readonly follow: HTMLButtonElement;
+  private tabKey = "";
   private chipKey = "";
   private playingSlot: number | undefined;
 
@@ -66,6 +68,9 @@ export class PatternBar {
     this.arrangementInput.addEventListener("blur", () => {
       this.arrangementInput.hidden = true;
     });
+    this.follow = action("follow", "Follow the playing pattern", () => {
+      app.setView({ follow: !app.view.follow });
+    });
 
     this.element = h("section", { class: "patterns" }, [
       h("div", { class: "pattern-row" }, [
@@ -88,6 +93,7 @@ export class PatternBar {
         this.chips,
         this.arrangementInput,
         h("div", { class: "pattern-actions" }, [
+          this.follow,
           action("+ add", "Add this pattern to the end of the song", () => this.append()),
           action("edit", "Edit the arrangement as text", () => this.editArrangement()),
         ]),
@@ -96,17 +102,28 @@ export class PatternBar {
   }
 
   update(song: Song, view: View): void {
-    this.tabs.replaceChildren(
-      ...song.patterns.map((pattern) =>
-        h("button", {
-          role: "tab",
-          class: "tab",
-          "data-pattern": pattern.id,
-          "aria-selected": String(pattern.id === view.patternId),
-          text: pattern.id,
-        }),
-      ),
-    );
+    const tabKey = song.patterns.map((pattern) => pattern.id).join(",");
+    if (tabKey !== this.tabKey) {
+      this.tabKey = tabKey;
+      this.tabs.replaceChildren(
+        ...song.patterns.map((pattern) =>
+          h("button", {
+            role: "tab",
+            class: "tab",
+            "data-pattern": pattern.id,
+            "aria-selected": String(pattern.id === view.patternId),
+            text: pattern.id,
+          }),
+        ),
+      );
+    }
+    for (const tab of this.tabs.children) {
+      tab.setAttribute(
+        "aria-selected",
+        String((tab as HTMLElement).dataset["pattern"] === view.patternId),
+      );
+    }
+    this.follow.setAttribute("aria-pressed", String(view.follow));
     const pattern = this.app.pattern();
     this.bars.forEach((button, index) => {
       button.setAttribute("aria-pressed", String(pattern.bars === index + 1));

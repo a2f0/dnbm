@@ -73,8 +73,16 @@ export class MixerPanel {
   private readonly fx = new Map<string, ParamControl>();
   private readonly master = new Map<string, ParamControl>();
   private readonly masterMeters = [new Meter(), new Meter()];
+  private peak = 0;
+  private readonly peakReadout = h("button", {
+    class: "master-peak",
+    text: "−∞ dBFS",
+    title: "Reset master peak",
+    "aria-label": "Reset master peak",
+  });
 
   constructor(private readonly app: App) {
+    this.peakReadout.addEventListener("click", () => this.resetPeak());
     this.strips = h("div", { class: "strips" });
     this.element = h("section", { class: "mixer", "aria-label": "Mixer" }, [
       this.strips,
@@ -166,6 +174,7 @@ export class MixerPanel {
         this.masterMeters[1]?.element ?? "",
         this.master.get("level")?.element ?? "",
       ]),
+      this.peakReadout,
     ]);
   }
 
@@ -190,7 +199,11 @@ export class MixerPanel {
     const name = h("button", { class: "strip-name", text: id, title: "Select track" });
     name.addEventListener("click", () => this.app.setView({ trackId: id }));
     const toggle = (text: string, key: "mute" | "solo") => {
-      const button = h("button", { class: "mini", text, title: key === "mute" ? "Mute" : "Solo" });
+      const button = h("button", {
+        class: "mini",
+        text,
+        title: `${key === "mute" ? "Mute" : "Solo"} ${id}`,
+      });
       button.addEventListener("click", () =>
         this.app.edit((song) => {
           const track = song.tracks.find((candidate) => candidate.id === id);
@@ -221,10 +234,15 @@ export class MixerPanel {
       this.tracks = song.tracks.map((track) => this.trackStrip(track.id));
       this.strips.replaceChildren(...this.tracks.map((strip) => strip.element));
     }
+    const anySolo = song.tracks.some((track) => track.mixer.solo);
     song.tracks.forEach((track, index) => {
       const strip = this.tracks[index];
       if (!strip) return;
       setClass(strip.element, `strip${track.id === view.trackId ? " selected" : ""}`);
+      strip.element.classList.toggle(
+        "inaudible",
+        track.mixer.mute || (anySolo && !track.mixer.solo),
+      );
       strip.mute.setAttribute("aria-pressed", String(track.mixer.mute));
       strip.solo.setAttribute("aria-pressed", String(track.mixer.solo));
       for (const [param, control] of strip.controls)
@@ -246,5 +264,17 @@ export class MixerPanel {
     this.masterMeters.forEach((meter, index) => {
       meter.show(levels[MASTER_METER + index] ?? 0);
     });
+    const peak = Math.max(levels[MASTER_METER] ?? 0, levels[MASTER_METER + 1] ?? 0);
+    if (peak > this.peak) {
+      this.peak = peak;
+      this.peakReadout.textContent = `${(20 * Math.log10(peak)).toFixed(1)} dBFS`;
+      this.peakReadout.classList.toggle("hot", peak >= 0.98);
+    }
+  }
+
+  resetPeak(): void {
+    this.peak = 0;
+    this.peakReadout.textContent = "−∞ dBFS";
+    this.peakReadout.classList.remove("hot");
   }
 }

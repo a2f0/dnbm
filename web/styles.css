@@ -428,6 +428,9 @@ input {
 }
 
 .ruler {
+  position: sticky;
+  top: -8px;
+  z-index: 3;
   display: grid;
   grid-template-columns: var(--head) repeat(var(--steps), var(--cell-size));
   column-gap: 2px;
@@ -435,9 +438,13 @@ input {
   margin-bottom: 4px;
   color: var(--faint);
   font-size: 10px;
+  background: var(--bg);
 }
 
 .ruler-head {
+  position: sticky;
+  left: 0;
+  background: var(--bg);
   margin-right: 6px;
 }
 
@@ -468,6 +475,9 @@ input {
 }
 
 .track-head {
+  position: sticky;
+  left: 0;
+  z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 4px;
@@ -476,6 +486,8 @@ input {
   height: var(--cell-size);
   padding-right: 2px;
   border-radius: 3px;
+  background: var(--bg);
+  box-shadow: 6px 0 var(--bg);
 }
 
 .track-head.selected {
@@ -675,6 +687,23 @@ input {
 .strip.selected .strip-name {
   color: var(--bright);
   font-weight: 700;
+}
+
+.strip.inaudible :is(.strip-name, .strip-knobs, .strip-fader) {
+  opacity: 0.45;
+}
+
+.master-peak {
+  width: 100%;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.master-peak.hot {
+  border-color: var(--bright);
+  color: var(--bright);
 }
 
 .strip-title {

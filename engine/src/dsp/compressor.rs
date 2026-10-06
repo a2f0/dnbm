@@ -46,7 +46,11 @@ impl Compressor {
         for (l, r) in left.iter_mut().zip(right.iter_mut()) {
             let peak = l.abs().max(r.abs());
             let level_db = 20.0 * (peak + 1e-9).log10();
-            let target = Self::gain_computer(level_db, threshold_db, ratio);
+            let target = if amount < 0.001 {
+                0.0
+            } else {
+                Self::gain_computer(level_db, threshold_db, ratio)
+            };
             let coefficient = if target < self.reduction_db {
                 self.attack
             } else {
@@ -69,5 +73,22 @@ mod tests {
         assert_eq!(Compressor::gain_computer(-40.0, -10.0, 4.0), 0.0);
         let reduction = Compressor::gain_computer(0.0, -10.0, 4.0);
         assert!((reduction + 7.5).abs() < 1e-4);
+    }
+
+    #[test]
+    fn disabling_glue_releases_gain_reduction_even_on_a_loud_bus() {
+        let mut compressor = Compressor::new(48_000.0);
+        let mut left = vec![0.9; 48_000];
+        let mut right = left.clone();
+        compressor.process(&mut left, &mut right, 0.8);
+        assert!(compressor.reduction_db < -3.0);
+
+        // Turning glue off releases smoothly, then reaches unity on a sustained signal.
+        left = vec![0.9; 96_000];
+        right = left.clone();
+        compressor.process(&mut left, &mut right, 0.0);
+        assert!(left[0] < 0.8);
+        assert!((left[left.len() - 1] - 0.9).abs() < 1e-4);
+        assert_eq!(left, right);
     }
 }
