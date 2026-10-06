@@ -1,0 +1,5 @@
+[tools]
+bun = "1.4.2"
+shellcheck = "0.11.0"
+# wasm-opt, which shrinks and optimizes the engine after cargo builds it.
+"aqua:WebAssembly/binaryen" = "132"

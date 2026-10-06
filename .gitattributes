@@ -1,0 +1,5 @@
+* text=auto eol=lf
+# Songs are canonical JSON (bun run songs:fmt). Don't set "diff" on any
+# path: it makes git treat binary content there as text, which hides it from
+# scripts/checks/checkBinaryFiles.sh (scripts/checks/checkBinaryFiles.test.ts checks).
+*.dnbm.json text eol=lf linguist-language=JSON

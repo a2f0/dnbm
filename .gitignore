@@ -1,0 +1,16 @@
+.DS_Store
+
+# Bun
+node_modules/
+
+# Build output (scripts/build.ts)
+dist/
+
+# Cargo
+engine/target/
+
+# Renders (bun run render)
+*.wav
+
+# Wrangler local state
+.wrangler/

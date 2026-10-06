@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+MESSAGE_FILE="$1"
+
+cd "$REPO_ROOT"
+
+echo "Linting commit message..."
+sh scripts/checks/lintCommitMessage.sh "$MESSAGE_FILE"

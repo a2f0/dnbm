@@ -1,0 +1,35 @@
+{
+  "name": "dnbm",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "scripts": {
+    "agent-tool": "agent-tool",
+    "agents:check": "agent-tool skills check",
+    "agents:sync": "agent-tool skills install --apply",
+    "build": "bun scripts/build.ts",
+    "build:engine": "bun scripts/build.ts --engine",
+    "check": "sh scripts/checks/checkAll.sh",
+    "deploy": "bun run build && wrangler deploy",
+    "dev": "bun scripts/serve.ts",
+    "engine:check": "cargo fmt --manifest-path engine/Cargo.toml --check && cargo clippy --manifest-path engine/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path engine/Cargo.toml",
+    "fix": "biome check --write && cargo fmt --manifest-path engine/Cargo.toml && bun scripts/songs.ts fmt",
+    "hooks:install": "sh scripts/git/install-hooks.sh",
+    "lint": "biome ci",
+    "lint:binary-files": "sh scripts/checks/checkBinaryFiles.sh",
+    "render": "bun scripts/render.ts",
+    "songs:check": "bun scripts/songs.ts check",
+    "songs:fmt": "bun scripts/songs.ts fmt",
+    "test": "bun run build:engine && bun test",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@a2f0/agent-tool": "0.1.4",
+    "@biomejs/biome": "2.5.15",
+    "@tsconfig/strictest": "2.0.8",
+    "@types/bun": "1.4.2",
+    "typescript": "7.0.2",
+    "wrangler": "4.147.0"
+  }
+}

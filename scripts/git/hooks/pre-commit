@@ -1,0 +1,24 @@
+#!/bin/sh
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+cd "$REPO_ROOT"
+
+echo "Linting branch name..."
+sh scripts/checks/lintBranchName.sh
+
+echo "Checking for binary files..."
+sh scripts/checks/checkBinaryFiles.sh --staged
+
+echo "Checking staged files with Biome..."
+bunx --no-install biome check --staged --no-errors-on-unmatched
+
+echo "Checking song files..."
+bun scripts/songs.ts check
+
+if git diff --cached --name-only | grep -q '^engine/'; then
+  echo "Checking engine formatting..."
+  cargo fmt --manifest-path engine/Cargo.toml --check
+fi

@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "dnbm",
+  "compatibility_date": "2026-10-06",
+  "workers_dev": false,
+  "preview_urls": false,
+  // Assets-only Worker: Cloudflare serves dist/ (bun run build) directly.
+  // Terraform in a2f0/a2f0.net owns the custom domain (dnbm.a2f0.net).
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "none"
+  },
+  "observability": { "enabled": true }
+}
