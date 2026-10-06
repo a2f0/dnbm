@@ -44,6 +44,9 @@ export class App {
   readonly view: View;
   private host: EngineHost | undefined;
   private starting: Promise<EngineHost | undefined> | undefined;
+  private playbackRequest = 0;
+  private readonly auditions = new Map<number, symbol>();
+  private keyboardNavigation = false;
   private syncQueued = false;
   private fileHandle: FileSystemFileHandle | undefined;
   private fileName: string | undefined;
@@ -161,6 +164,12 @@ export class App {
     this.transport.update(song, view, this.store);
     this.patternBar.update(song, view);
     this.grid.update(song, view);
+    const position = view.position;
+    this.grid.playhead(
+      view.playing && position?.playing && song.patterns[position.pattern]?.id === view.patternId
+        ? position.step
+        : undefined,
+    );
     this.device.update(song, view);
     this.mixer.update(song, view);
     const name = this.fileName ?? songFileName(song.title);
@@ -227,14 +236,23 @@ export class App {
   }
 
   async play(): Promise<void> {
+    const request = ++this.playbackRequest;
+    this.setView({ playing: true });
     const host = await this.engine();
-    if (!host) return;
+    if (request !== this.playbackRequest) return;
+    if (!host) {
+      this.setView({ playing: false });
+      return;
+    }
+    this.mixer.resetPeak();
     if (this.view.mode === "song") host.play(PlayMode.Song, this.view.startSlot);
     else host.play(PlayMode.Pattern, this.patternIndex());
     this.setView({ playing: true });
   }
 
   stop(): void {
+    this.playbackRequest++;
+    this.auditions.clear();
     this.host?.stop();
     this.setView({ playing: false });
   }
@@ -244,8 +262,12 @@ export class App {
     else void this.play();
   }
 
-  selectPattern(id: string): void {
-    this.setView({ patternId: id, cursor: undefined });
+  selectPattern(id: string, pauseFollow = false): void {
+    this.setView({
+      patternId: id,
+      cursor: undefined,
+      ...(pauseFollow && this.view.playing && this.view.mode === "song" ? { follow: false } : {}),
+    });
     if (this.view.playing && this.view.mode === "loop")
       this.host?.cue(PlayMode.Pattern, this.patternIndex());
   }
@@ -260,21 +282,32 @@ export class App {
   /** Starts song mode from a slot, or marks it as where play starts. */
   playFrom(slot: number): void {
     const id = this.song.arrangement[slot];
-    this.setView({ startSlot: slot, mode: "song", ...(id ? { patternId: id } : {}) });
+    this.setView({ startSlot: slot, mode: "song", follow: true, ...(id ? { patternId: id } : {}) });
     if (this.view.playing) this.host?.play(PlayMode.Song, slot);
   }
 
   /** Plays a track's sound now: a hit, or a note held until `release`. */
-  async audition(trackIndex: number, note?: number): Promise<void> {
+  async audition(trackIndex: number, note?: number, duration?: number): Promise<void> {
     const track = this.song.tracks[trackIndex];
     if (!track) return;
-    const host = await this.engine();
     const spec = INSTRUMENTS[track.instrument];
     const pitch = note ?? this.view.penNotes.get(track.id) ?? spec.defaultNote;
-    host?.trigger(trackIndex, spec.melodic ? 1 : 0.85, pitch);
+    const token = Symbol();
+    this.auditions.set(trackIndex, token);
+    const host = await this.engine();
+    if (!host || this.auditions.get(trackIndex) !== token) return;
+    const current = this.song.tracks[trackIndex];
+    if (current?.id !== track.id || current.instrument !== track.instrument) return;
+    host.trigger(trackIndex, spec.melodic ? 1 : 0.85, pitch);
+    if (duration !== undefined) {
+      setTimeout(() => {
+        if (this.auditions.get(trackIndex) === token) this.release(trackIndex);
+      }, duration);
+    }
   }
 
   release(trackIndex: number): void {
+    this.auditions.delete(trackIndex);
     this.host?.release(trackIndex);
   }
 
@@ -388,7 +421,12 @@ export class App {
     const command = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
     const typing = isTyping(event.target);
-    if (!command) return event.key === " " && !typing ? () => this.togglePlay() : undefined;
+    if (!command) {
+      const button = event.target instanceof HTMLElement && event.target.closest("button");
+      return event.key === " " && !typing && !(button && this.keyboardNavigation)
+        ? () => this.togglePlay()
+        : undefined;
+    }
     if (key === "s") return () => void this.save(event.shiftKey);
     if (key === "o") return () => void this.open();
     if (typing) return undefined;
@@ -398,7 +436,11 @@ export class App {
   }
 
   private listen(): void {
+    window.addEventListener("pointerdown", () => {
+      this.keyboardNavigation = false;
+    });
     window.addEventListener("keydown", (event) => {
+      if (event.key === "Tab" || event.key === "Enter") this.keyboardNavigation = true;
       const action = this.shortcut(event);
       if (!action) return;
       event.preventDefault();

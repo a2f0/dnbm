@@ -97,6 +97,7 @@ export class Grid {
   private rows: Row[] = [];
   private structure = "";
   private paint: Paint | undefined;
+  private auditionTrack: number | undefined;
   private now: number | undefined;
 
   constructor(private readonly app: App) {
@@ -148,8 +149,20 @@ export class Grid {
         text: track.id,
         title: "Select; hold to audition",
       });
-      const mute = h("button", { class: "mini", "data-action": "mute", text: "M", title: "Mute" });
-      const solo = h("button", { class: "mini", "data-action": "solo", text: "S", title: "Solo" });
+      const mute = h("button", {
+        class: "mini",
+        "data-action": "mute",
+        text: "M",
+        title: `Mute ${track.id}`,
+        "aria-label": `Mute ${track.id}`,
+      });
+      const solo = h("button", {
+        class: "mini",
+        "data-action": "solo",
+        text: "S",
+        title: `Solo ${track.id}`,
+        "aria-label": `Solo ${track.id}`,
+      });
       const head = h("div", { class: "track-head", role: "rowheader" }, [
         name,
         h("span", { class: "track-kind", text: track.instrument }),
@@ -336,7 +349,10 @@ export class Grid {
   }
 
   private endPaint(): void {
-    if (!this.paint) return;
+    if (!this.paint && this.auditionTrack === undefined) return;
+    if (this.auditionTrack !== undefined) this.app.release(this.auditionTrack);
+    if (this.paint) this.app.release(this.paint.track);
+    this.auditionTrack = undefined;
     this.paint = undefined;
     this.app.endGesture();
   }
@@ -346,7 +362,7 @@ export class Grid {
     if (!t) return;
     if (action === "select") {
       this.app.setView({ trackId: t.id });
-      void this.app.audition(track);
+      void this.app.audition(track, undefined, 180);
     } else if (action === "mute" || action === "solo") {
       this.app.edit((song) => {
         const target = song.tracks[track];
@@ -363,7 +379,12 @@ export class Grid {
       const track = Number(row.dataset["track"]);
       const action = target.closest<HTMLElement>("[data-action]")?.dataset["action"];
       if (action) {
-        this.headAction(action, track);
+        if (action === "select") {
+          this.app.setView({ trackId: this.app.song.tracks[track]?.id ?? "" });
+          this.auditionTrack = track;
+          this.body.setPointerCapture(event.pointerId);
+          void this.app.audition(track);
+        }
         return;
       }
       const cell = target.closest<HTMLElement>(".cell");
@@ -376,15 +397,17 @@ export class Grid {
     this.body.addEventListener("pointermove", (event) =>
       this.continuePaint(event.clientX, event.clientY),
     );
-    this.body.addEventListener("pointerup", (event) => {
-      const row = (event.target as HTMLElement).closest<HTMLElement>(".grid-row");
-      if (row && (event.target as HTMLElement).closest("[data-action='select']")) {
-        this.app.release(Number(row.dataset["track"]));
-      }
-      if (this.paint) this.app.release(this.paint.track);
-      this.endPaint();
+    this.body.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement;
+      const action = target.closest<HTMLElement>("[data-action]")?.dataset["action"];
+      const row = target.closest<HTMLElement>(".grid-row");
+      if (action && row && (action !== "select" || event.detail === 0))
+        this.headAction(action, Number(row.dataset["track"]));
     });
+    this.body.addEventListener("pointerup", () => this.endPaint());
     this.body.addEventListener("pointercancel", () => this.endPaint());
+    this.body.addEventListener("lostpointercapture", () => this.endPaint());
+    window.addEventListener("blur", () => this.endPaint());
     this.body.addEventListener("contextmenu", (event) => {
       const cell = (event.target as HTMLElement).closest<HTMLElement>(".cell");
       const row = cell?.closest<HTMLElement>(".grid-row");
@@ -418,7 +441,7 @@ export class Grid {
    * Alt+Up/Down an octave. Backspace, Delete or . clears.
    */
   private onKey(event: KeyboardEvent): void {
-    if (event.metaKey || event.ctrlKey) return;
+    if (event.target !== this.body || event.metaKey || event.ctrlKey) return;
     const { track, step } = this.app.view.cursor ?? { track: 0, step: 0 };
     const handled = this.melodic(track)
       ? this.noteKey(event, track, step)
@@ -457,8 +480,7 @@ export class Grid {
     const next = Math.min(HIGHEST_NOTE, Math.max(LOWEST_NOTE, note));
     this.write(track, [step], noteToken(next));
     this.setPen(track, next);
-    void this.app.audition(track, next);
-    setTimeout(() => this.app.release(track), 180);
+    void this.app.audition(track, next, 180);
   }
 
   private noteKey(event: KeyboardEvent, track: number, step: number): boolean {

@@ -15,6 +15,8 @@ export class PatternBar {
   private readonly bars: HTMLButtonElement[];
   private readonly chips: HTMLElement;
   private readonly arrangementInput: HTMLInputElement;
+  private readonly follow: HTMLButtonElement;
+  private tabKey = "";
   private chipKey = "";
   private playingSlot: number | undefined;
 
@@ -22,7 +24,7 @@ export class PatternBar {
     this.tabs = h("div", { class: "tabs", role: "tablist", "aria-label": "Patterns" });
     this.tabs.addEventListener("click", (event) => {
       const tab = (event.target as HTMLElement).closest<HTMLElement>("[data-pattern]");
-      if (tab?.dataset["pattern"]) app.selectPattern(tab.dataset["pattern"]);
+      if (tab?.dataset["pattern"]) app.selectPattern(tab.dataset["pattern"], true);
     });
     this.tabs.addEventListener("dblclick", () => void this.rename());
 
@@ -66,6 +68,9 @@ export class PatternBar {
     this.arrangementInput.addEventListener("blur", () => {
       this.arrangementInput.hidden = true;
     });
+    this.follow = action("follow", "Follow the playing pattern", () => {
+      app.setView({ follow: !app.view.follow });
+    });
 
     this.element = h("section", { class: "patterns" }, [
       h("div", { class: "pattern-row" }, [
@@ -88,6 +93,7 @@ export class PatternBar {
         this.chips,
         this.arrangementInput,
         h("div", { class: "pattern-actions" }, [
+          this.follow,
           action("+ add", "Add this pattern to the end of the song", () => this.append()),
           action("edit", "Edit the arrangement as text", () => this.editArrangement()),
         ]),
@@ -96,17 +102,25 @@ export class PatternBar {
   }
 
   update(song: Song, view: View): void {
-    this.tabs.replaceChildren(
-      ...song.patterns.map((pattern) =>
-        h("button", {
-          role: "tab",
-          class: "tab",
-          "data-pattern": pattern.id,
-          "aria-selected": String(pattern.id === view.patternId),
-          text: pattern.id,
-        }),
-      ),
-    );
+    const tabKey = song.patterns.map((pattern) => pattern.id).join(",");
+    if (tabKey !== this.tabKey) {
+      this.tabKey = tabKey;
+      this.tabs.replaceChildren(
+        ...song.patterns.map((pattern) =>
+          h("button", {
+            role: "tab",
+            class: "tab",
+            "data-pattern": pattern.id,
+            "aria-selected": String(pattern.id === view.patternId),
+            text: pattern.id,
+          }),
+        ),
+      );
+    }
+    for (const tab of this.tabs.querySelectorAll<HTMLElement>(".tab")) {
+      tab.setAttribute("aria-selected", String(tab.dataset["pattern"] === view.patternId));
+    }
+    this.follow.setAttribute("aria-pressed", String(view.follow));
     const pattern = this.app.pattern();
     this.bars.forEach((button, index) => {
       button.setAttribute("aria-pressed", String(pattern.bars === index + 1));
@@ -153,7 +167,7 @@ export class PatternBar {
     this.app.edit((draft) => {
       draft.patterns.push(createPattern(id, 2, draft.tracks));
     });
-    this.app.selectPattern(id);
+    this.app.selectPattern(id, true);
   }
 
   private duplicate(): void {
@@ -165,7 +179,7 @@ export class PatternBar {
       const index = draft.patterns.findIndex((pattern) => pattern.id === source.id);
       draft.patterns.splice(index + 1, 0, { ...structuredClone(source), id });
     });
-    this.app.selectPattern(id);
+    this.app.selectPattern(id, true);
   }
 
   private async rename(): Promise<void> {
