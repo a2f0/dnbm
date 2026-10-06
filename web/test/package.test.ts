@@ -348,6 +348,36 @@ describe("the packaged app embedded in a cross-origin frame", () => {
     // The rename test's edit is unsaved; saving marks the song clean.
   }, 20_000);
 
+  test("opens a song through a file input after the discard prompt, when the frame may not show a picker", async () => {
+    await frame.locator('.grid-row[data-track="0"] .cell').nth(3).click();
+    const chooser = page.waitForEvent("filechooser");
+    await frame.click('button:text-is("open")');
+    await frame
+      .getByRole("dialog", { name: "Discard unsaved changes to this song?" })
+      .locator('button:text-is("discard")')
+      .click();
+    const song = await readFile(join(installed, "site", "songs", "undertow.dnbm.json"));
+    await (await chooser).setFiles({
+      name: "undertow.dnbm.json",
+      mimeType: "application/json",
+      buffer: song,
+    });
+    await frame.waitForFunction(
+      () => document.querySelector<HTMLInputElement>(".title")?.value === "Undertow",
+    );
+    expect(await frame.textContent(".status-message")).toBe("Opened undertow.dnbm.json.");
+  }, 20_000);
+
+  test("cancelling the file input keeps the song", async () => {
+    const chooser = page.waitForEvent("filechooser");
+    // The song was just opened, so there is nothing to discard and no prompt.
+    await frame.click('button:text-is("open")');
+    await (await chooser).setFiles([]);
+    expect(await frame.inputValue(".title")).toBe("Undertow");
+    expect(await frame.locator("dialog[open]").count()).toBe(0);
+    expect(await frame.textContent(".status-message")).toBe("Opened undertow.dnbm.json.");
+  }, 20_000);
+
   test("keeps an edit made just before the host destroys and remounts the app", async () => {
     await frame.fill(".title", "Night Bus");
     // Commit the edit, then destroy and remount at once: milliseconds, not the
