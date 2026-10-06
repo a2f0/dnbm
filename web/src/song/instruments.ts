@@ -11,12 +11,21 @@ export interface ParamSpec {
   readonly default: number;
   /** Values round to a multiple of this, so saved songs never carry float noise. */
   readonly step: number;
-  readonly unit?: "Hz" | "s" | "dB" | "ct" | "×" | "steps";
+  readonly unit?: "Hz" | "s" | "dB" | "ct" | "st" | "×" | "steps";
   /** Knobs sweep logarithmic parameters evenly by ratio rather than difference. */
   readonly curve?: "log";
 }
 
-export const INSTRUMENT_KINDS = ["kick", "snare", "hat", "perc", "sub", "reese", "pluck"] as const;
+export const INSTRUMENT_KINDS = [
+  "kick",
+  "snare",
+  "hat",
+  "perc",
+  "sub",
+  "reese",
+  "pluck",
+  "pad",
+] as const;
 export type InstrumentKind = (typeof INSTRUMENT_KINDS)[number];
 
 export interface InstrumentSpec {
@@ -173,6 +182,26 @@ export const INSTRUMENTS: Readonly<Record<InstrumentKind, InstrumentSpec>> = {
       amount("tone", "Tone", 0.45),
       amount("decay", "Decay", 0.6),
       seconds("release", "Release", 0.01, 1, 0.08),
+    ],
+  },
+  pad: {
+    kind: "pad",
+    label: "Pad",
+    description:
+      "Detuned saw pairs an interval apart through a slow resonant 24 dB filter: drones and stabs",
+    melodic: true,
+    defaultNote: 41,
+    params: [
+      hz("cutoff", "Cutoff", 40, 12000, 400),
+      amount("resonance", "Reso", 0.25),
+      { key: "interval", label: "Interval", min: 0, max: 12, default: 7, step: 1, unit: "st" },
+      { key: "detune", label: "Detune", min: 0, max: 50, default: 12, step: 0.1, unit: "ct" },
+      seconds("attack", "Attack", 0.001, 4, 0.4),
+      amount("env", "Env", 0.2),
+      seconds("decay", "Decay", 0.01, 4, 0.8),
+      { key: "rate", label: "Rate", min: 1, max: 64, default: 32, step: 1, unit: "steps" },
+      amount("sweep", "Sweep", 0.2),
+      seconds("release", "Release", 0.01, 4, 0.6),
     ],
   },
 };

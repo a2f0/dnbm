@@ -74,6 +74,7 @@ levels.
 | `sub` | notes | `glide` s, `attack` s, `release` s, `warmth` |
 | `reese` | notes | `cutoff` Hz, `resonance`, `detune` cents, `sub`, `env`, `decay` s, `rate` (wobble cycle in sixteenths), `wobble`, `glide` s, `release` s |
 | `pluck` | notes | `tone`, `decay`, `release` s |
+| `pad` | notes | `cutoff` Hz, `resonance`, `interval` semitones, `detune` cents, `attack` s, `env`, `decay` s, `rate` (sweep cycle in sixteenths), `sweep`, `release` s |
 
 Ranges and defaults live in `web/src/song/instruments.ts` and in the schema.
 
@@ -102,7 +103,7 @@ track. A missing row is all rests.
 | `x` | hit (0.75) |
 | `X` | accent (1.0) |
 
-**Note rows** (sub, reese, pluck) take a three-character token per step:
+**Note rows** (sub, reese, pluck, pad) take a three-character token per step:
 
 | Token | Step |
 | --- | --- |
@@ -110,8 +111,8 @@ track. A missing row is all rests.
 | `---` | tie: hold the note through this step |
 | `...` | rest: release the note |
 
-A note sounds until a rest. On `sub` and `reese`, a note that follows a held note
-glides to it without retriggering, as on a monophonic synth.
+A note sounds until a rest. On `sub`, `reese` and `pad`, a note that follows a held
+note glides to it without retriggering, as on a monophonic synth.
 
 Parsing ignores spacing and `|`, and accepts `F1`, `Gb1` and lowercase letters.
 Saving writes rows canonically: hit rows group four steps per beat, note rows separate

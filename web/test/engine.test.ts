@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { arrangementFrames, renderSong } from "../src/audio/offline";
 import { PlayMode } from "../src/audio/wasmEngine";
@@ -7,9 +8,9 @@ import { parseSong, parseSongText } from "../src/song/format";
 import { expectedEngineDescription } from "../src/song/instruments";
 import { createEngine } from "./engineWasm";
 
-const undertow = parseSongText(
-  await Bun.file(join(import.meta.dir, "..", "..", "songs", "undertow.dnbm.json")).text(),
-);
+const SONGS = join(import.meta.dir, "..", "..", "songs");
+const undertow = parseSongText(await Bun.file(join(SONGS, "undertow.dnbm.json")).text());
+const exampleFiles = (await readdir(SONGS)).filter((file) => file.endsWith(".dnbm.json")).sort();
 
 const fourOnTheFloor = parseSong({
   dnbm: 1,
@@ -47,6 +48,27 @@ describe("engine", () => {
     }
     expect(peak).toBeLessThanOrEqual(1);
     expect(Math.sqrt(sum / first.left.length)).toBeGreaterThan(0.1);
+  });
+
+  describe("renders every example song loud and never clipping", () => {
+    expect(exampleFiles.length).toBeGreaterThan(1);
+    for (const file of exampleFiles) {
+      test(file, async () => {
+        const song = parseSongText(await Bun.file(join(SONGS, file)).text());
+        const rendered = renderSong(await createEngine(), song, { tailSeconds: 1 });
+        let peak = 0;
+        let sum = 0;
+        for (const channel of [rendered.left, rendered.right]) {
+          for (const sample of channel) {
+            if (!Number.isFinite(sample)) throw new Error("rendered a non-finite sample");
+            peak = Math.max(peak, Math.abs(sample));
+            sum += sample * sample;
+          }
+        }
+        expect(peak).toBeLessThanOrEqual(1);
+        expect(Math.sqrt(sum / (rendered.left.length * 2))).toBeGreaterThan(0.1);
+      });
+    }
   });
 
   test("renders the same whatever the block size", async () => {

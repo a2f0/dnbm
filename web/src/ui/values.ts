@@ -14,6 +14,8 @@ export function formatValue(spec: ParamSpec, value: number): string {
       return value <= spec.min ? "-inf" : `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
     case "ct":
       return `${value.toFixed(1)}ct`;
+    case "st":
+      return `${value}st`;
     case "×":
       return `${value.toFixed(2)}×`;
     case "steps":
