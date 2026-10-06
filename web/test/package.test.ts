@@ -296,13 +296,47 @@ describe("the packaged app embedded in a cross-origin frame", () => {
   test("asks before discarding edits with an in-app dialog", async () => {
     await frame.locator('.grid-row[data-track="0"] .cell').nth(1).click();
     await frame.click('button:text-is("new")');
-    const dialog = frame.locator("dialog[open]");
+    const dialog = frame.getByRole("dialog", { name: "Discard unsaved changes to this song?" });
     await dialog.waitFor();
-    expect(await dialog.textContent()).toContain("Discard unsaved changes");
     await dialog.locator('button:text-is("discard")').click();
     await frame.waitForFunction(
       () => document.querySelector<HTMLInputElement>(".title")?.value === "Untitled",
     );
+  }, 20_000);
+
+  test("cancel and Escape keep unsaved edits", async () => {
+    const step = frame.locator('.grid-row[data-track="0"] .cell').nth(2);
+    await step.click();
+    expect(await step.getAttribute("class")).toContain("hit");
+    for (const dismiss of ["cancel", "Escape"]) {
+      await frame.click('button:text-is("new")');
+      const dialog = frame.getByRole("dialog", { name: "Discard unsaved changes to this song?" });
+      await dialog.waitFor();
+      if (dismiss === "cancel") await dialog.locator('button:text-is("cancel")').click();
+      else await frame.press("dialog[open]", "Escape");
+      await dialog.waitFor({ state: "detached" });
+      expect([dismiss, await step.getAttribute("class")]).toEqual([
+        dismiss,
+        expect.stringContaining("hit"),
+      ]);
+    }
+  }, 20_000);
+
+  test("renames a pattern through an in-app prompt, and keeps it on cancel", async () => {
+    const prompt = frame.getByRole("dialog", { name: /Pattern id/ });
+    await frame.click('button:text-is("rename")');
+    await prompt.waitFor();
+    expect(await prompt.locator("input").inputValue()).toBe("a");
+    await prompt.locator("input").fill("intro");
+    await prompt.locator("input").press("Enter");
+    await frame.waitForSelector('.tab[data-pattern="intro"]');
+    expect(await frame.locator(".chip").allTextContents()).toEqual(["intro"]);
+
+    await frame.click('button:text-is("rename")');
+    await prompt.locator("input").fill("ignored");
+    await prompt.locator('button:text-is("cancel")').click();
+    await prompt.waitFor({ state: "detached" });
+    expect(await frame.locator(".tab").allTextContents()).toEqual(["intro"]);
   }, 20_000);
 
   test("saves by downloading when the frame may not show a file picker", async () => {
@@ -311,6 +345,7 @@ describe("the packaged app embedded in a cross-origin frame", () => {
       frame.click('button:text-is("save")'),
     ]);
     expect(download.suggestedFilename()).toBe("untitled.dnbm.json");
+    // The rename test's edit is unsaved; saving marks the song clean.
   }, 20_000);
 
   test("keeps an edit made just before the host destroys and remounts the app", async () => {

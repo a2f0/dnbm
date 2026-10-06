@@ -6,13 +6,19 @@ import { h } from "./dom";
 
 const ACCEPT = "accept";
 
-/** Shows a modal dialog and resolves with how it closed: accepted, or cancelled. */
-function ask(content: readonly Node[], accept: string, focus?: HTMLElement): Promise<boolean> {
+let dialogs = 0;
+
+/**
+ * Shows a modal dialog and resolves with how it closed: accepted, or cancelled. The
+ * message element names the dialog for assistive technology.
+ */
+function ask(message: HTMLElement, accept: string, focus?: HTMLElement): Promise<boolean> {
   return new Promise((resolve) => {
+    message.id = `dialog-message-${++dialogs}`;
     const cancelButton = h("button", { type: "button", text: "cancel" });
     const acceptButton = h("button", { type: "button", class: "dialog-accept", text: accept });
-    const dialog = h("dialog", { class: "dialog" }, [
-      ...content,
+    const dialog = h("dialog", { class: "dialog", "aria-labelledby": message.id }, [
+      message,
       h("div", { class: "dialog-actions" }, [cancelButton, acceptButton]),
     ]);
     cancelButton.addEventListener("click", () => dialog.close());
@@ -30,7 +36,7 @@ function ask(content: readonly Node[], accept: string, focus?: HTMLElement): Pro
 
 /** Asks the user to confirm an action; resolves true if they accept. */
 export function confirmDialog(message: string, accept = "ok"): Promise<boolean> {
-  return ask([h("p", { class: "dialog-message", text: message })], accept);
+  return ask(h("p", { class: "dialog-message", text: message }), accept);
 }
 
 /** Asks the user for text; resolves with it, or undefined if they cancel. */
@@ -46,11 +52,14 @@ export async function promptDialog(
     "aria-label": message,
   });
   const label = h("label", { class: "dialog-message" }, [message, input]);
-  const accepted = ask([label], accept, input);
+  const accepted = ask(label, accept, input);
   input.select();
-  // Enter accepts, as it would in a form.
+  // Enter accepts, as it would in a form. Closing returns focus to the button that
+  // opened the dialog, so the key's default action must not reach it and reopen it.
   input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") input.closest("dialog")?.close(ACCEPT);
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    input.closest("dialog")?.close(ACCEPT);
   });
   return (await accepted) ? input.value : undefined;
 }
