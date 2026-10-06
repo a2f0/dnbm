@@ -36,7 +36,7 @@ hand edits.
 
 | Field | Meaning |
 | --- | --- |
-| `dnbm` | The format version, `1` |
+| `dnbm` | The format version, `1`. New instrument kinds are additive and keep it; a change to existing fields bumps it with a migration |
 | `bpm` | Tempo, 60 to 220 |
 | `swing` | 0 (straight) to 1 (every second sixteenth delayed to a triplet) |
 | `master` | `level` in dB; `glue`, the bus compressor; `drive`, the soft clipper |
