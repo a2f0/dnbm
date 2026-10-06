@@ -146,9 +146,12 @@ impl Pluck {
             } else {
                 self.quiet = 0;
             }
-        }
-        if self.quiet > self.buffer.len() || self.fade.is_silent() {
-            self.active = false;
+            // Stop on the sample the sound is spent, so the state its next trigger starts
+            // from never depends on where a block boundary fell.
+            if self.quiet > self.buffer.len() || self.fade.is_silent() {
+                self.active = false;
+                break;
+            }
         }
     }
 }

@@ -156,6 +156,11 @@ impl Reese {
             let voice = filtered * 0.8 + sub * self.sub * 0.55;
             *o += voice * self.amp.tick() * self.gain * self.fade.tick();
             self.filter_env *= self.filter_multiplier;
+            // Stop on the sample the sound is spent, so the state its next trigger starts
+            // from never depends on where a block boundary fell.
+            if !self.is_active() {
+                break;
+            }
         }
     }
 }

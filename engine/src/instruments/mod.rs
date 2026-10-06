@@ -294,6 +294,67 @@ mod tests {
         }
     }
 
+    /// Triggers a voice, releases it, lets it fall silent and retriggers it, at fixed
+    /// samples, rendering in blocks of `block` samples.
+    fn retriggered(kind: InstrumentKind, params: &[f32], block: usize) -> Vec<f32> {
+        let sample_rate = 48_000.0;
+        let mut voice = Voice::new(kind, sample_rate, 1);
+        let mut values = [0.0; MAX_PARAMS];
+        values[..params.len()].copy_from_slice(params);
+        voice.set_params(&values);
+        let context = Context {
+            step_seconds: 0.086,
+        };
+        let mut out = vec![0.0; 32_768];
+        for (index, chunk) in out.chunks_mut(block).enumerate() {
+            match index * block {
+                0 => voice.trigger(1.0, 41.0, false),
+                4_096 => voice.release(),
+                24_576 => voice.trigger(1.0, 46.0, false),
+                _ => {}
+            }
+            voice.render(chunk, context);
+        }
+        out
+    }
+
+    #[test]
+    fn every_voice_renders_the_same_whatever_the_block_size() {
+        let cases: [(InstrumentKind, &[f32]); 8] = [
+            (InstrumentKind::Kick, &[48.0, 5.0, 0.035, 0.05, 0.35]),
+            (InstrumentKind::Snare, &[185.0, 0.35, 0.05, 0.65]),
+            (InstrumentKind::Hat, &[1.0, 0.03, 0.6]),
+            (InstrumentKind::Perc, &[420.0, 0.05, 0.3, 0.2]),
+            (InstrumentKind::Sub, &[0.03, 0.005, 0.01, 0.15]),
+            (
+                InstrumentKind::Reese,
+                &[700.0, 0.3, 18.0, 0.4, 0.35, 0.3, 8.0, 0.2, 0.06, 0.01],
+            ),
+            (InstrumentKind::Pluck, &[0.45, 0.1, 0.01]),
+            (
+                InstrumentKind::Pad,
+                &[400.0, 0.25, 7.0, 12.0, 0.01, 0.2, 0.8, 32.0, 0.2, 0.01],
+            ),
+        ];
+        for (kind, params) in cases {
+            let small = retriggered(kind, params, 128);
+            let large = retriggered(kind, params, 4_096);
+            // The voice fell silent before the retrigger, and came back.
+            assert!(
+                small[20_000..24_576].iter().all(|x| x.abs() < 1e-4),
+                "{kind:?} is still sounding"
+            );
+            assert!(
+                small[24_576..].iter().any(|x| x.abs() > 0.01),
+                "{kind:?} did not retrigger"
+            );
+            assert!(
+                small == large,
+                "{kind:?} renders differently per block size"
+            );
+        }
+    }
+
     #[test]
     fn percussive_voices_fall_silent() {
         let sample_rate = 48_000.0;

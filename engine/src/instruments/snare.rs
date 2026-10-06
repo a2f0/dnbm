@@ -116,9 +116,12 @@ impl Snare {
             self.pitch *= self.pitch_multiplier;
             self.noise_env *= self.noise_multiplier;
             self.transient *= self.transient_multiplier;
-        }
-        if (self.body < 1e-4 && self.noise_env < 1e-4) || self.fade.is_silent() {
-            self.active = false;
+            // Stop on the sample the sound is spent, so the state its next trigger starts
+            // from never depends on where a block boundary fell.
+            if (self.body < 1e-4 && self.noise_env < 1e-4) || self.fade.is_silent() {
+                self.active = false;
+                break;
+            }
         }
     }
 }

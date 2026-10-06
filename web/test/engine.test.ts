@@ -21,15 +21,18 @@ const fourOnTheFloor = parseSong({
   arrangement: ["a"],
 });
 
-/** A held pad note, a legato change, a release, a retrigger and a rest to ring out in. */
+/**
+ * A held pad note, a legato change, a release short enough for the voice to fall silent
+ * mid-block, then a retrigger and a rest to ring out in.
+ */
 const padNotes = parseSong({
   dnbm: 1,
   bpm: 170,
-  tracks: [{ id: "pad", instrument: "pad", params: { attack: 0.05, release: 0.3 } }],
+  tracks: [{ id: "pad", instrument: "pad", params: { attack: 0.05, release: 0.01 } }],
   patterns: [
     {
       id: "a",
-      rows: { pad: "F-2 --- --- ---  G#2 --- --- ...  ... F-2 --- ---  ... ... ... ..." },
+      rows: { pad: "F-2 --- --- ---  G#2 --- --- ...  ... ... ... ...  F-2 --- ... ..." },
     },
   ],
   arrangement: ["a"],
