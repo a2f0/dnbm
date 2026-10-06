@@ -239,10 +239,10 @@ export class MixerPanel {
     song.tracks.forEach((track, index) => {
       const strip = this.tracks[index];
       if (!strip) return;
-      setClass(strip.element, `strip${track.id === view.trackId ? " selected" : ""}`);
-      strip.element.classList.toggle(
-        "inaudible",
-        track.mixer.mute || (anySolo && !track.mixer.solo),
+      const inaudible = track.mixer.mute || (anySolo && !track.mixer.solo);
+      setClass(
+        strip.element,
+        `strip${track.id === view.trackId ? " selected" : ""}${inaudible ? " inaudible" : ""}`,
       );
       strip.mute.setAttribute("aria-pressed", String(track.mixer.mute));
       strip.solo.setAttribute("aria-pressed", String(track.mixer.solo));

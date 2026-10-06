@@ -25,8 +25,8 @@ WebAssembly target pinned in `rust-toolchain.toml` on first use.
 The editor opens on **Undertow**, a 172 BPM roller in F minor: syncopated sub and
 reese bass, dry backbeats, ghost snares and sparse, filtered dub echoes. Its 36 bars
 move from a short intro through four-bar variations, a half-time break and a heavier
-return. Press space to play; choose Undertow from **examples** to load the new mix
-if your browser restored an older session.
+return. Press space to play. The browser restores your last session; choose
+Undertow from **examples** to reload the bundled song.
 
 Click an arrangement slot to start there, or choose **loop** to work on one pattern.
 **follow** keeps the grid on the playing pattern; selecting another pattern during

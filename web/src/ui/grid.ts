@@ -349,6 +349,7 @@ export class Grid {
   }
 
   private endPaint(): void {
+    if (!this.paint && this.auditionTrack === undefined) return;
     if (this.auditionTrack !== undefined) this.app.release(this.auditionTrack);
     if (this.paint) this.app.release(this.paint.track);
     this.auditionTrack = undefined;

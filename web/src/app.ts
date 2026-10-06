@@ -46,6 +46,7 @@ export class App {
   private starting: Promise<EngineHost | undefined> | undefined;
   private playbackRequest = 0;
   private readonly auditions = new Map<number, symbol>();
+  private keyboardNavigation = false;
   private syncQueued = false;
   private fileHandle: FileSystemFileHandle | undefined;
   private fileName: string | undefined;
@@ -261,11 +262,11 @@ export class App {
     else void this.play();
   }
 
-  selectPattern(id: string): void {
+  selectPattern(id: string, pauseFollow = false): void {
     this.setView({
       patternId: id,
       cursor: undefined,
-      ...(this.view.playing && this.view.mode === "song" ? { follow: false } : {}),
+      ...(pauseFollow && this.view.playing && this.view.mode === "song" ? { follow: false } : {}),
     });
     if (this.view.playing && this.view.mode === "loop")
       this.host?.cue(PlayMode.Pattern, this.patternIndex());
@@ -281,7 +282,7 @@ export class App {
   /** Starts song mode from a slot, or marks it as where play starts. */
   playFrom(slot: number): void {
     const id = this.song.arrangement[slot];
-    this.setView({ startSlot: slot, mode: "song", ...(id ? { patternId: id } : {}) });
+    this.setView({ startSlot: slot, mode: "song", follow: true, ...(id ? { patternId: id } : {}) });
     if (this.view.playing) this.host?.play(PlayMode.Song, slot);
   }
 
@@ -422,7 +423,9 @@ export class App {
     const typing = isTyping(event.target);
     if (!command) {
       const button = event.target instanceof HTMLElement && event.target.closest("button");
-      return event.key === " " && !typing && !button ? () => this.togglePlay() : undefined;
+      return event.key === " " && !typing && !(button && this.keyboardNavigation)
+        ? () => this.togglePlay()
+        : undefined;
     }
     if (key === "s") return () => void this.save(event.shiftKey);
     if (key === "o") return () => void this.open();
@@ -433,7 +436,11 @@ export class App {
   }
 
   private listen(): void {
+    window.addEventListener("pointerdown", () => {
+      this.keyboardNavigation = false;
+    });
     window.addEventListener("keydown", (event) => {
+      if (event.key === "Tab" || event.key === "Enter") this.keyboardNavigation = true;
       const action = this.shortcut(event);
       if (!action) return;
       event.preventDefault();

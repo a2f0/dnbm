@@ -72,7 +72,10 @@ describe("layout", () => {
       const head = await page.locator(".track-head").first().boundingBox();
       expect(head?.x).toBeGreaterThanOrEqual(0);
       expect(head?.x).toBeLessThan(20);
-      await page.getByRole("button", { name: "Mute kick", exact: true }).first().click();
+      await page
+        .locator('.grid-row[data-track="0"]')
+        .getByRole("button", { name: "Mute kick", exact: true })
+        .click();
       expect(
         await page
           .locator('.grid-row[data-track="0"] [data-action="mute"]')

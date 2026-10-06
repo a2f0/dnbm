@@ -378,9 +378,27 @@ describe("the packaged app embedded in a cross-origin frame", () => {
     expect(await selected.getAttribute("aria-selected")).toBe("true");
     expect(await frame.locator(".cell.now").count()).toBe(0);
     await follow.click();
-    await frame.waitForSelector('.tab[data-pattern="intro"][aria-selected="true"]');
+    await frame.waitForFunction(() => {
+      const playing = document.querySelector(".chip.now");
+      return (
+        playing &&
+        document.querySelector('.tab[aria-selected="true"]')?.textContent === playing.textContent
+      );
+    });
     await frame.waitForSelector(".cell.now");
     await frame.click(".play");
+  }, 20_000);
+
+  test("Space controls playback after mouse clicks without repeating the clicked action", async () => {
+    const mute = frame.locator('.grid-row[data-track="0"] [data-action="mute"]');
+    await mute.click();
+    await page.keyboard.press("Space");
+    await frame.waitForSelector(".cell.now");
+    expect(await mute.getAttribute("aria-pressed")).toBe("true");
+    await page.keyboard.press("Space");
+    expect(await frame.locator(".play").getAttribute("aria-label")).toBe("Play");
+    expect(await mute.getAttribute("aria-pressed")).toBe("true");
+    await mute.click();
   }, 20_000);
 
   test("asks before discarding edits with an in-app dialog", async () => {
