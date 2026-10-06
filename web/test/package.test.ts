@@ -37,13 +37,15 @@ beforeAll(async () => {
   consumer = join(temporary, "consumer");
   installed = join(consumer, "node_modules", "@a2f0", "dnbm");
   await mkdir(installed, { recursive: true });
+  // npm exports its settings to lifecycle scripts (npm_config_dry_run, under
+  // `npm publish --dry-run`), and a nested npm would inherit them, so pack without.
+  const environment = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.toLowerCase().startsWith("npm_")),
+  );
   const output = execFileSync(
     "npm",
     ["pack", "--ignore-scripts", "--json", "--pack-destination", temporary],
-    {
-      cwd: ROOT,
-      encoding: "utf8",
-    },
+    { cwd: ROOT, encoding: "utf8", env: environment },
   );
   [packed] = JSON.parse(output) as [Packed];
   execFileSync("tar", [
