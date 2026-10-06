@@ -61,6 +61,28 @@ async function layout(width: number, height: number): Promise<Layout> {
 }
 
 describe("layout", () => {
+  test("track labels stay visible while scrolling a four-bar pattern", async () => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    try {
+      await page.goto(server.url.href);
+      await page.click('.tab[data-pattern="roll"]');
+      await page.locator(".grid-scroll").evaluate((grid) => {
+        grid.scrollLeft = 600;
+      });
+      const head = await page.locator(".track-head").first().boundingBox();
+      expect(head?.x).toBeGreaterThanOrEqual(0);
+      expect(head?.x).toBeLessThan(20);
+      await page.getByRole("button", { name: "Mute kick", exact: true }).first().click();
+      expect(
+        await page
+          .locator('.grid-row[data-track="0"] [data-action="mute"]')
+          .getAttribute("aria-pressed"),
+      ).toBe("true");
+    } finally {
+      await page.close();
+    }
+  });
+
   test("a fitted 1200 by 800 window shows everything on one screen", async () => {
     const fitted = await layout(1200, 800);
     expect(fitted.topBar).toBeLessThan(60);

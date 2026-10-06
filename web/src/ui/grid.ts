@@ -154,12 +154,14 @@ export class Grid {
         "data-action": "mute",
         text: "M",
         title: `Mute ${track.id}`,
+        "aria-label": `Mute ${track.id}`,
       });
       const solo = h("button", {
         class: "mini",
         "data-action": "solo",
         text: "S",
         title: `Solo ${track.id}`,
+        "aria-label": `Solo ${track.id}`,
       });
       const head = h("div", { class: "track-head", role: "rowheader" }, [
         name,

@@ -203,6 +203,7 @@ export class MixerPanel {
         class: "mini",
         text,
         title: `${key === "mute" ? "Mute" : "Solo"} ${id}`,
+        "aria-label": `${key === "mute" ? "Mute" : "Solo"} ${id}`,
       });
       button.addEventListener("click", () =>
         this.app.edit((song) => {

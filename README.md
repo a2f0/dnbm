@@ -22,7 +22,17 @@ bun run dev                       # http://localhost:8174
 Rust comes from [rustup](https://rustup.rs), which installs the toolchain and
 WebAssembly target pinned in `rust-toolchain.toml` on first use.
 
-The editor opens on **Undertow**, an example song in `songs/`. Press space to play.
+The editor opens on **Undertow**, a 172 BPM roller in F minor: syncopated sub and
+reese bass, dry backbeats, ghost snares and sparse, filtered dub echoes. Its 36 bars
+move from a short intro through four-bar variations, a half-time break and a heavier
+return. Press space to play; choose Undertow from **examples** to load the new mix
+if your browser restored an older session.
+
+Click an arrangement slot to start there, or choose **loop** to work on one pattern.
+**follow** keeps the grid on the playing pattern; selecting another pattern during
+song playback turns follow off so you can edit ahead. Muted channels and channels
+excluded by solo dim in the mixer. The master holds its highest peak in dBFS; click
+that reading to reset it, or start playback for a fresh reading.
 
 ## Songs
 

@@ -420,7 +420,10 @@ export class App {
     const command = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
     const typing = isTyping(event.target);
-    if (!command) return event.key === " " && !typing ? () => this.togglePlay() : undefined;
+    if (!command) {
+      const button = event.target instanceof HTMLElement && event.target.closest("button");
+      return event.key === " " && !typing && !button ? () => this.togglePlay() : undefined;
+    }
     if (key === "s") return () => void this.save(event.shiftKey);
     if (key === "o") return () => void this.open();
     if (typing) return undefined;

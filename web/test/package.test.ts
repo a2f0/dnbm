@@ -288,10 +288,98 @@ describe("the packaged app embedded in a cross-origin frame", () => {
     expect(await frame.locator(".brand").isVisible()).toBe(false);
   });
 
+  test("stop cancels playback while the first audio startup is pending", async () => {
+    const requested = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    await page.route("**/engine.wasm", async (route) => {
+      requested.resolve();
+      await released.promise;
+      await route.continue();
+    });
+    try {
+      await frame.click(".play");
+      await requested.promise;
+      expect(await frame.locator(".play").getAttribute("aria-label")).toBe("Stop");
+      await frame.click(".play");
+    } finally {
+      released.resolve();
+    }
+    await frame.waitForSelector(".master .meter-fill[style]", { state: "attached" });
+    // Let several actual audio quanta report after the module has finished loading.
+    await page.waitForTimeout(200);
+    expect(await frame.locator(".play").getAttribute("aria-label")).toBe("Play");
+    expect(await frame.locator(".cell.now").count()).toBe(0);
+    await page.unroute("**/engine.wasm");
+  }, 20_000);
+
+  test("releasing a preview before startup finishes leaves no held bass note", async () => {
+    await frame.goto(frame.url());
+    await frame.waitForSelector(".cell");
+    const requested = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    await page.route("**/engine.wasm", async (route) => {
+      requested.resolve();
+      await released.promise;
+      await route.continue();
+    });
+    try {
+      // A click presses and releases the track before the engine can trigger it.
+      await frame.locator(".track-name").filter({ hasText: /^sub$/ }).click();
+      await requested.promise;
+    } finally {
+      released.resolve();
+    }
+    await frame.waitForSelector(".master .meter-fill[style]", { state: "attached" });
+    await page.waitForTimeout(300);
+    expect(await frame.locator(".master-peak").textContent()).toBe("−∞ dBFS");
+    await page.unroute("**/engine.wasm");
+  }, 20_000);
+
   test("starts audio from a click in the frame", async () => {
     await frame.click(".play");
     // The playhead moves only when the worklet reports steps from the running engine.
     await frame.waitForSelector(".cell.now", { timeout: 10_000 });
+    await frame.click(".play");
+  }, 20_000);
+
+  test("track buttons work from the keyboard without editing steps or starting playback", async () => {
+    const row = frame.locator('.grid-row[data-track="0"]');
+    const before = await row
+      .locator(".cell")
+      .evaluateAll((cells) => cells.map((cell) => cell.getAttribute("aria-label")));
+    const mute = row.getByRole("button", { name: "Mute kick", exact: true });
+    await mute.press("Enter");
+    expect(await mute.getAttribute("aria-pressed")).toBe("true");
+    expect(await frame.locator(".strips .strip").first().getAttribute("class")).toContain(
+      "inaudible",
+    );
+    await mute.press("Space");
+    expect(await mute.getAttribute("aria-pressed")).toBe("false");
+    expect(await frame.locator(".play").getAttribute("aria-label")).toBe("Play");
+    expect(
+      await row
+        .locator(".cell")
+        .evaluateAll((cells) => cells.map((cell) => cell.getAttribute("aria-label"))),
+    ).toEqual(before);
+    // Selecting a track with Enter auditions it, without entering a grid step.
+    await row.locator(".track-name").press("Enter");
+    expect(await frame.inputValue(".device-name")).toBe("kick");
+  }, 20_000);
+
+  test("browsing a pattern pauses follow and returning to follow restores the playhead", async () => {
+    await frame.click(".play");
+    await frame.waitForSelector(".cell.now");
+    const selected = frame.locator('.tab[data-pattern="pressure"]');
+    await selected.click();
+    expect(await selected.getAttribute("aria-selected")).toBe("true");
+    const follow = frame.getByRole("button", { name: "follow", exact: true });
+    expect(await follow.getAttribute("aria-pressed")).toBe("false");
+    await page.waitForTimeout(200);
+    expect(await selected.getAttribute("aria-selected")).toBe("true");
+    expect(await frame.locator(".cell.now").count()).toBe(0);
+    await follow.click();
+    await frame.waitForSelector('.tab[data-pattern="intro"][aria-selected="true"]');
+    await frame.waitForSelector(".cell.now");
     await frame.click(".play");
   }, 20_000);
 
