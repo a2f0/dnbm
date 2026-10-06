@@ -1,10 +1,12 @@
 # dnbm
 
-A dark drum and bass sequencer and mixer in the browser, hosted at dnbm.a2f0.net. The
-audio engine is Rust compiled to WebAssembly (`engine/`); the editor is TypeScript and
-DOM with no framework (`web/`). `README.md` gives the overview and `docs/` the detail:
+A dark drum and bass sequencer and mixer in the browser, hosted at dnbm.a2f0.net and
+published to npm as `@a2f0/dnbm` for embedding (for example in a2f0.net's experiment
+mini-apps). The audio engine is Rust compiled to WebAssembly (`engine/`); the editor is
+TypeScript and DOM with no framework (`web/`), and `web/src/package/` holds the
+package's two entrypoints. `README.md` gives the overview and `docs/` the detail:
 [song format](docs/song-format.md), [architecture](docs/architecture.md),
-[deploying](docs/deploying.md).
+[package](docs/package.md), [deploying](docs/deploying.md).
 
 ## Setup
 
@@ -26,6 +28,7 @@ bun run test                         # build the engine, then bun test
 bun run typecheck && bunx biome ci   # TypeScript and Biome
 bun run songs:check                  # songs are valid and canonical
 bun run lint:binary-files            # no binary files since upstream (or pass --staged, --all)
+bun run build:package                # the npm package, into lib/ and site/
 bun run dev                          # http://localhost:8174, rebuilding on change
 ```
 
@@ -60,7 +63,16 @@ Run them with `bun run agent-tool ...`. Do not edit the managed skill copies in
 `.agents/skills` and `.claude/skills`; after upgrading the dependency, run
 `bun run agents:sync` and commit the dependency, lockfile, skills and
 `.agent-tool-skills.json` together. The required check is `CI gate` (see
-`agent-tool.json`); packages are not versioned.
+`agent-tool.json`).
+
+The root package is versioned (`versions` in `agent-tool.json`): each shipped PR carries
+`package.json` one patch past the pinned base, and a deliberate minor or major bump is
+kept. Run `bun run agent-tool versions prepare <pinned-base-sha>` after every integration
+or repair and before each review; it commits the bump as `chore: bump package versions`.
+Each merge that raises the version publishes `@a2f0/dnbm` to npm through
+`.github/workflows/npm-publish.yml`; verify that run and the npm version after merging,
+and report a failed publish separately from the merge. The package's public API is
+`mountDnbm` and `copyDnbmAssets`; keep it backward compatible or bump the minor version.
 
 Merging deploys only once the `DNBM_DEPLOY` repository variable is set; until then,
 `bun run deploy` publishes by hand (see `docs/deploying.md`).

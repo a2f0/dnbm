@@ -3,7 +3,16 @@
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!engine/target", "!dist", "!.agents", "!.claude/skills", "!**/*.dnbm.json"]
+    "includes": [
+      "**",
+      "!engine/target",
+      "!dist",
+      "!lib",
+      "!site",
+      "!.agents",
+      "!.claude/skills",
+      "!**/*.dnbm.json"
+    ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "javascript": { "formatter": { "quoteStyle": "double" } },

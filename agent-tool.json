@@ -29,7 +29,7 @@
     "requireStrictBaseFreshness": false
   },
   "versions": {
-    "packages": [],
+    "packages": ["."],
     "lockfile": "bun.lock",
     "validate": [],
     "commitMessage": "chore: bump package versions"

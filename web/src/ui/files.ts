@@ -28,6 +28,11 @@ function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+/** A cross-origin frame may refuse the pickers; fall back as if they were absent. */
+function isRefused(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "SecurityError";
+}
+
 /** Asks for a song file. Resolves undefined if the user cancels. */
 export async function openSongFile(): Promise<OpenedFile | undefined> {
   if (picker.showOpenFilePicker) {
@@ -38,7 +43,7 @@ export async function openSongFile(): Promise<OpenedFile | undefined> {
       return { text: await file.text(), name: file.name, handle };
     } catch (error) {
       if (isAbort(error)) return undefined;
-      throw error;
+      if (!isRefused(error)) throw error;
     }
   }
   return new Promise((resolve) => {
@@ -86,7 +91,7 @@ export async function saveSongFile(
       target = await picker.showSaveFilePicker({ suggestedName: name, types: SONG_TYPES });
     } catch (error) {
       if (isAbort(error)) return null;
-      throw error;
+      if (!isRefused(error)) throw error;
     }
   }
   if (!target) {

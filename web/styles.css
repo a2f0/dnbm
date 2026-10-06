@@ -132,6 +132,11 @@ input {
   letter-spacing: 0.25em;
 }
 
+/* Embedded (mountDnbm), the host names the app. */
+[data-embed] .brand {
+  display: none;
+}
+
 .title {
   width: 22ch;
   border-color: transparent;

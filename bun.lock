@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "dnbm",
+      "name": "@a2f0/dnbm",
       "devDependencies": {
         "@a2f0/agent-tool": "0.1.4",
         "@biomejs/biome": "2.5.15",

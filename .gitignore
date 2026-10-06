@@ -3,8 +3,10 @@
 # Bun
 node_modules/
 
-# Build output (scripts/build.ts)
+# Build output (scripts/build.ts) and the package (scripts/buildPackage.ts)
 dist/
+lib/
+site/
 
 # Cargo
 engine/target/
