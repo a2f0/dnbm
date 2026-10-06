@@ -44,11 +44,11 @@ impl Compressor {
         let ratio = 1.5 + amount * 4.5;
         let makeup_db = -threshold_db * (1.0 - 1.0 / ratio) * 0.4 * amount.min(1.0);
         for (l, r) in left.iter_mut().zip(right.iter_mut()) {
-            let peak = l.abs().max(r.abs());
-            let level_db = 20.0 * (peak + 1e-9).log10();
             let target = if amount < 0.001 {
                 0.0
             } else {
+                let peak = l.abs().max(r.abs());
+                let level_db = 20.0 * (peak + 1e-9).log10();
                 Self::gain_computer(level_db, threshold_db, ratio)
             };
             let coefficient = if target < self.reduction_db {

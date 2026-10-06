@@ -117,11 +117,8 @@ export class PatternBar {
         ),
       );
     }
-    for (const tab of this.tabs.children) {
-      tab.setAttribute(
-        "aria-selected",
-        String((tab as HTMLElement).dataset["pattern"] === view.patternId),
-      );
+    for (const tab of this.tabs.querySelectorAll<HTMLElement>(".tab")) {
+      tab.setAttribute("aria-selected", String(tab.dataset["pattern"] === view.patternId));
     }
     this.follow.setAttribute("aria-pressed", String(view.follow));
     const pattern = this.app.pattern();

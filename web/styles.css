@@ -445,7 +445,7 @@ input {
 
 .ruler-head {
   position: sticky;
-  left: 0;
+  left: -12px;
   background: var(--bg);
   margin-right: 6px;
 }
@@ -478,7 +478,7 @@ input {
 
 .track-head {
   position: sticky;
-  left: 0;
+  left: -12px;
   z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;

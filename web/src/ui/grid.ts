@@ -382,7 +382,7 @@ export class Grid {
         if (action === "select") {
           this.app.setView({ trackId: this.app.song.tracks[track]?.id ?? "" });
           this.auditionTrack = track;
-          target.closest<HTMLElement>("[data-action]")?.setPointerCapture(event.pointerId);
+          this.body.setPointerCapture(event.pointerId);
           void this.app.audition(track);
         }
         return;

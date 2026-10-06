@@ -78,7 +78,6 @@ export class MixerPanel {
     class: "master-peak",
     text: "−∞ dBFS",
     title: "Reset master peak",
-    "aria-label": "Reset master peak",
   });
 
   constructor(private readonly app: App) {

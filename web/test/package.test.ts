@@ -342,6 +342,47 @@ describe("the packaged app embedded in a cross-origin frame", () => {
     await frame.click(".play");
   }, 20_000);
 
+  test("a held preview releases outside the grid after switching patterns", async () => {
+    const sub = frame.locator(".track-name").filter({ hasText: /^sub$/ });
+    const bounds = await sub.boundingBox();
+    if (!bounds) throw new Error("sub track is not visible");
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    const subMeter = frame
+      .locator(".strips .strip")
+      .filter({ has: frame.locator(".strip-name").filter({ hasText: /^sub$/ }) })
+      .locator(".meter-fill");
+    await frame.waitForFunction(() => {
+      const strips = [...document.querySelectorAll(".strips .strip")];
+      const sub = strips.find((strip) => strip.querySelector(".strip-name")?.textContent === "sub");
+      return (
+        Number.parseFloat(sub?.querySelector<HTMLElement>(".meter-fill")?.style.height ?? "0") > 0
+      );
+    });
+    // Follow can replace every row while a pointer is held. Change patterns without
+    // releasing the mouse to reproduce that replacement while the note is sounding.
+    await frame
+      .locator('.tab[data-pattern="roll"]')
+      .evaluate((tab: HTMLButtonElement) => tab.click());
+    await page.mouse.move(10, 10);
+    await page.mouse.up();
+    await frame.waitForFunction(() =>
+      [...document.querySelectorAll<HTMLElement>(".strips .meter-fill")].every(
+        (fill) => Number.parseFloat(fill.style.height) === 0,
+      ),
+    );
+    expect(
+      await subMeter.evaluate((fill) => Number.parseFloat((fill as HTMLElement).style.height)),
+    ).toBe(0);
+    const peak = frame.locator(".master-peak");
+    const held = Number.parseFloat((await peak.textContent()) ?? "");
+    expect(Number.isFinite(held)).toBe(true);
+    await peak.click();
+    const reset = (await peak.textContent()) ?? "";
+    // An effects tail can already have supplied another reading after the reset.
+    expect(reset === "−∞ dBFS" || Number.parseFloat(reset) < held - 6).toBe(true);
+  }, 20_000);
+
   test("track buttons work from the keyboard without editing steps or starting playback", async () => {
     const row = frame.locator('.grid-row[data-track="0"]');
     const before = await row
