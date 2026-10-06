@@ -5,7 +5,7 @@
     "ignoreUnknown": true,
     "includes": [
       "**",
-      "!engine/target",
+      "!packages/synth/engine/target",
       "!dist",
       "!lib",
       "!site",

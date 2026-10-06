@@ -10,5 +10,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["web/src", "web/test", "scripts"]
+  "include": ["src", "packages/*/src", "packages/*/test", "test", "scripts"]
 }

@@ -13,7 +13,8 @@ npm install --save-exact @a2f0/dnbm
 ## Copy the app's assets
 
 The app is a static site: a page, its scripts, an AudioWorklet, the WebAssembly
-engine and the example songs. Copy it into a directory your host serves, from a
+engine and the example songs, and the player at `player/`, which plays songs through
+the same engine. Copy it into a directory your host serves, from a
 Node 22+ or Bun build script:
 
 ```ts
@@ -64,6 +65,31 @@ useEffect(() => {
   return () => dnbm.destroy();
 }, []);
 ```
+
+## Mount the player
+
+The same assets hold the player, which plays a playlist of songs and edits nothing:
+a display with elapsed time and a spectrum, seek, shuffle, repeat and volume.
+
+```ts
+import { mountDnbmPlayer } from "@a2f0/dnbm";
+
+const player = mountDnbmPlayer(container, {
+  assetsUrl: "/dnbm/",
+  songs: ["/dnbm/songs/wraith.dnbm.json", "/dnbm/songs/undertow.dnbm.json"],
+});
+
+// When the component leaves:
+player.destroy();
+```
+
+`songs` lists song files in playing order; relative URLs resolve against the host
+page. Without it, the player lists every example song the assets hold. The frame
+fetches the songs itself, so a song on another origin must allow the assets' origin
+through CORS. `assetsUrl`, `title` and `branding` work as for `mountDnbm`, and the
+returned instance is the same. Embedded, the player fills its container and its
+playlist takes whatever height the rest leaves, so any size around 440 by 420 pixels
+or more suits it; it stores nothing.
 
 Asset files are also reachable as `@a2f0/dnbm/assets/<path>` for tooling that
 resolves package files directly. Songs saved from an embedded app are ordinary

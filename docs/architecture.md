@@ -1,7 +1,19 @@
 # Architecture
 
+Three workspace packages under `packages/`. `synth` is everything that makes sound and
+everything that reads songs; the two apps, `sequencer` and `player`, build on it and
+never import each other. `scripts/build.ts` bundles the synth into each app, so the
+packages are private and only the root's `@a2f0/dnbm` is published, with its
+entrypoints in `src/`.
+
+| Package | Holds |
+| --- | --- |
+| `synth` (`@a2f0/dnbm-synth`) | The Rust engine (`engine/`), its AudioWorklet host, offline render and WAV export (`src/audio/`), and the song model, format, schema and compiler (`src/song/`) |
+| `sequencer` | The editor: the song store and its panels |
+| `player` | A playlist, a display and transport controls over a list of songs |
+
 ```text
- web/src/ui/*  ──edits──▶  SongStore  ──compileSong──▶  Float32Array
+  sequencer UI ──edits──▶  SongStore  ──compileSong──▶  Float32Array
      ▲                       │                              │ postMessage
      │ position, meters      │ autosave, files              ▼
  EngineHost  ◀──────────────────────────────────  worklet.ts (AudioWorklet)
@@ -10,12 +22,12 @@
                                                  engine.wasm (Rust)
 ```
 
-## The engine (`engine/`)
+## The engine (`packages/synth/engine/`)
 
 A Rust crate compiled to `wasm32-unknown-unknown` with no imports and no generated
 glue: `src/lib.rs` exports a C ABI of numbers and pointers into linear memory, and
-`web/src/audio/wasmEngine.ts` wraps it. `scripts/build.ts` builds it, runs `wasm-opt`,
-and fails if the module imports anything.
+`packages/synth/src/audio/wasmEngine.ts` wraps it. `scripts/build.ts` builds it, runs
+`wasm-opt`, and fails if the module imports anything.
 
 - **Sequencer** (`engine.rs`). Steps fire on the first sample at or after their time,
   tracked in fractional samples so tempo never drifts. A render call splits at step
@@ -34,26 +46,26 @@ and fails if the module imports anything.
 - **Determinism.** Noise comes from seeded xorshift generators and every start phase is
   fixed, so a song renders to identical samples every time. A voice stops on the exact
   sample it falls silent, so the state its next trigger starts from never depends on
-  where a block boundary fell. `web/test/engine.test.ts` and the instrument tests check
-  both.
+  where a block boundary fell. `packages/synth/test/engine.test.ts` and the instrument
+  tests check both.
 
 ## Songs into the engine
 
-The editor holds a `Song` (`web/src/song/model.ts`). `compileSong` flattens it into a
-`Float32Array` whose layout is documented in `engine/src/song.rs`; the engine checks
+The editor holds a `Song` (`packages/synth/src/song/model.ts`). `compileSong` flattens it into a
+`Float32Array` whose layout is documented in `packages/synth/engine/src/song.rs`; the engine checks
 every count, clamps every value, and keeps its old song if the new one is malformed.
 A song loads between render quanta without stopping playback or cutting voices, so
 editing while playing is seamless. The UI coalesces edits to one load per animation
 frame.
 
 Instrument parameters are positional in the compiled song. `engine_describe` reports
-the engine's order, and a test compares it with `web/src/song/instruments.ts`.
+the engine's order, and a test compares it with `packages/synth/src/song/instruments.ts`.
 
-## The page (`web/`)
+## The sequencer (`packages/sequencer/`)
 
 Plain TypeScript and DOM, bundled by `Bun.build` into three files: the page
-(`main.ts`), the worklet (`audio/worklet.ts`) and the WAV export worker
-(`audio/renderWorker.ts`). The AudioContext starts on the first gesture, as browsers
+(`main.ts`), and from the synth, the worklet (`audio/worklet.ts`) and the WAV export
+worker (`audio/renderWorker.ts`). The AudioContext starts on the first gesture, as browsers
 require. The worklet receives the engine's bytes, instantiates them, and reports the
 playing step and meter peaks back to the page.
 
@@ -62,17 +74,30 @@ normalize it, so the screen, the sound and the saved file always agree. The song
 autosaves to local storage; files open and save through the File System Access API
 where available, and through file inputs and downloads elsewhere.
 
+## The player (`packages/player/`)
+
+`Player` takes an array of songs and plays them in order, shuffled, or repeating,
+through the same `EngineHost`, worklet and engine module as the sequencer. The build
+writes it to `player/` in the site, beside the sequencer, and it loads the engine, the
+worklet and the example songs from the site's root.
+
+The engine reports the playing arrangement slot and step; `timeline.ts` turns those
+into seconds, and turns a seek back into the slot it falls in, so seeking lands on a
+slot boundary. The engine loops a song, so the player stops it on its last step, lets
+the reverb and delay ring out, and starts the next. Pause suspends the AudioContext,
+which stops the engine mid-step and resumes it exactly there.
+
 ## Adding an instrument
 
-1. Add the voice in `engine/src/instruments/`, a variant to `InstrumentKind` and
+1. Add the voice in `packages/synth/engine/src/instruments/`, a variant to `InstrumentKind` and
    `Voice`, and its parameter names in order.
 2. Add the same parameters, in the same order, with ranges and defaults, to
-   `INSTRUMENTS` in `web/src/song/instruments.ts`.
+   `INSTRUMENTS` in `packages/synth/src/song/instruments.ts`.
 3. Run `bun run check`. The engine description test fails until the two agree, and the
    level test in `instruments/mod.rs` keeps every instrument at a sane loudness.
 
 ## Look
 
-Every colour is a grey: `web/test/grayscale.test.ts` refuses any colour whose red,
+Every colour is a grey: `test/grayscale.test.ts` refuses any colour whose red,
 green and blue differ. Brightness carries meaning: brighter is louder, selected, or
 playing.

@@ -2,11 +2,22 @@
 
 A dark drum and bass sequencer and mixer in the browser, hosted at dnbm.a2f0.net and
 published to npm as `@a2f0/dnbm` for embedding (for example in a2f0.net's experiment
-mini-apps). The audio engine is Rust compiled to WebAssembly (`engine/`); the editor is
-TypeScript and DOM with no framework (`web/`), and `web/src/package/` holds the
-package's two entrypoints. `README.md` gives the overview and `docs/` the detail:
-[song format](docs/song-format.md), [architecture](docs/architecture.md),
-[package](docs/package.md), [deploying](docs/deploying.md).
+mini-apps). It is a Bun workspaces monorepo with three packages, TypeScript and DOM with
+no framework:
+
+- `packages/synth/`: the shared synthesizer. The Rust audio engine compiled to
+  WebAssembly (`engine/`), its AudioWorklet host (`src/audio/`), and the song format
+  (`src/song/`). Imported as `@a2f0/dnbm-synth/audio/*` and `@a2f0/dnbm-synth/song/*`.
+- `packages/sequencer/`: the editor and mixer, served at the site's root.
+- `packages/player/`: a playlist player for listening, served at `/player/`. It takes an
+  array of songs and edits nothing.
+
+The workspace packages are private; the root `package.json` is the published
+`@a2f0/dnbm`, whose two entrypoints are in `src/`, and the build bundles the synth into
+each app. `README.md` gives the
+overview and `docs/` the detail: [song format](docs/song-format.md),
+[architecture](docs/architecture.md), [package](docs/package.md),
+[deploying](docs/deploying.md).
 
 ## Setup
 
@@ -31,7 +42,7 @@ bun run typecheck && bunx biome ci   # TypeScript and Biome
 bun run songs:check                  # songs are valid and canonical
 bun run lint:binary-files            # no binary files since upstream (or pass --staged, --all)
 bun run build:package                # the npm package, into lib/ and site/
-bun run dev                          # http://localhost:8174, rebuilding on change
+bun run dev                          # http://localhost:8174 (player: /player/), rebuilding
 ```
 
 Check UI changes in a browser as well as in tests. `bun run render <song>` renders a
@@ -44,21 +55,23 @@ song with the same engine, for checking sound changes offline.
   `Co-authored-by` trailers; the hooks reject both.
 - No binary files in Git (`scripts/checks/checkBinaryFiles.sh`). Every sound is
   synthesized; there are no samples to commit.
-- Every colour is a grey with equal red, green and blue (`web/test/grayscale.test.ts`).
+- Every colour is a grey with equal red, green and blue (`test/grayscale.test.ts`).
 - The app runs embedded in other pages (`@a2f0/dnbm`), so don't use `window.confirm`,
   `prompt` or `alert`, which browsers block in cross-origin frames: use
-  `web/src/ui/dialog.ts`. Anything a frame may refuse needs a fallback.
+  `packages/sequencer/src/ui/dialog.ts`. Anything a frame may refuse needs a fallback.
 - The sound is dark: minor keys, low filter cutoffs and dark reverb by default. Keep new
   defaults and example songs in that spirit.
 - Songs are canonical (`bun run songs:fmt`). Never hand-format a `.dnbm.json` file, and
   never add volatile data (timestamps, random ids) to the format.
-- Instrument parameters are positional between `engine/src/instruments/mod.rs` and
-  `web/src/song/instruments.ts`; change both together (see "Adding an instrument" in
-  `docs/architecture.md`). Adding an instrument kind is additive and keeps the format
-  version, since every earlier song still reads the same way; a change to existing
-  fields bumps `FORMAT_VERSION` and needs a migration.
+- Instrument parameters are positional between
+  `packages/synth/engine/src/instruments/mod.rs` and
+  `packages/synth/src/song/instruments.ts`; change both together (see "Adding an
+  instrument" in `docs/architecture.md`). Adding an instrument kind is additive and keeps
+  the format version, since every earlier song still reads the same way; a change to
+  existing fields bumps `FORMAT_VERSION` and needs a migration.
 - The engine is deterministic and its output never exceeds full scale; tests check both.
   Keep noise seeded, and keep the render path free of allocation (only song loads allocate).
+- Code both apps need belongs in `packages/synth`; the apps never import each other.
 - `tsconfig.json` extends `@tsconfig/strictest`; index-signature access uses brackets
   (`record["key"]`), so Biome's `useLiteralKeys` is off.
 
@@ -79,7 +92,8 @@ or repair and before each review; it commits the bump as `chore: bump package ve
 Each merge that raises the version publishes `@a2f0/dnbm` to npm through
 `.github/workflows/npm-publish.yml`; verify that run and the npm version after merging,
 and report a failed publish separately from the merge. The package's public API is
-`mountDnbm` and `copyDnbmAssets`; keep it backward compatible or bump the minor version.
+`mountDnbm`, `mountDnbmPlayer` and `copyDnbmAssets`; keep it backward compatible or bump
+the minor version.
 
 Merging deploys only once the `DNBM_DEPLOY` repository variable is set; until then,
 `bun run deploy` publishes by hand (see `docs/deploying.md`).

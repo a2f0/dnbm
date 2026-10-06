@@ -6,6 +6,7 @@
       "name": "@a2f0/dnbm",
       "devDependencies": {
         "@a2f0/agent-tool": "0.1.4",
+        "@a2f0/dnbm-synth": "workspace:*",
         "@biomejs/biome": "2.5.15",
         "@tsconfig/strictest": "2.0.8",
         "@types/bun": "1.4.2",
@@ -14,9 +15,33 @@
         "wrangler": "4.147.0",
       },
     },
+    "packages/player": {
+      "name": "@a2f0/dnbm-player",
+      "version": "0.0.0",
+      "dependencies": {
+        "@a2f0/dnbm-synth": "workspace:*",
+      },
+    },
+    "packages/sequencer": {
+      "name": "@a2f0/dnbm-sequencer",
+      "version": "0.0.0",
+      "dependencies": {
+        "@a2f0/dnbm-synth": "workspace:*",
+      },
+    },
+    "packages/synth": {
+      "name": "@a2f0/dnbm-synth",
+      "version": "0.0.0",
+    },
   },
   "packages": {
     "@a2f0/agent-tool": ["@a2f0/agent-tool@0.1.4", "", { "bin": { "agent-tool": "src/index.ts" } }, "sha512-GeeE+LwLxL6NQgft3Nn1J+46pdSACJz3lzCQUayaTh/XIjbwcI2Dzg7xUpJ1apSZAWokapD6wgkEfBxEBPHsgA=="],
+
+    "@a2f0/dnbm-player": ["@a2f0/dnbm-player@workspace:packages/player"],
+
+    "@a2f0/dnbm-sequencer": ["@a2f0/dnbm-sequencer@workspace:packages/sequencer"],
+
+    "@a2f0/dnbm-synth": ["@a2f0/dnbm-synth@workspace:packages/synth"],
 
     "@biomejs/biome": ["@biomejs/biome@2.5.15", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "2.5.15", "@biomejs/cli-darwin-x64": "2.5.15", "@biomejs/cli-linux-arm64": "2.5.15", "@biomejs/cli-linux-arm64-musl": "2.5.15", "@biomejs/cli-linux-x64": "2.5.15", "@biomejs/cli-linux-x64-musl": "2.5.15", "@biomejs/cli-win32-arm64": "2.5.15", "@biomejs/cli-win32-x64": "2.5.15" }, "bin": { "biome": "bin/biome" } }, "sha512-WZTW4slm/pdkh92K6t/3aEN++44JD1PQ7squ7RCMLI1flHGl43DVOIGXvCjHiZgBMO1V4uYxoFNtqrIA4qGuIQ=="],
 

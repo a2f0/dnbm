@@ -18,7 +18,7 @@ bunx --no-install biome check --staged --no-errors-on-unmatched
 echo "Checking song files..."
 bun scripts/songs.ts check
 
-if git diff --cached --name-only | grep -q '^engine/'; then
+if git diff --cached --name-only | grep -q '^packages/synth/engine/'; then
   echo "Checking engine formatting..."
-  cargo fmt --manifest-path engine/Cargo.toml --check
+  cargo fmt --manifest-path packages/synth/engine/Cargo.toml --check
 fi

@@ -1,0 +1,10 @@
+{
+  "name": "@a2f0/dnbm-sequencer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The dnbm sequencer and mixer, published as @a2f0/dnbm from the repository root",
+  "type": "module",
+  "dependencies": {
+    "@a2f0/dnbm-synth": "workspace:*"
+  }
+}

@@ -1,9 +1,10 @@
 # Deploying
 
-The site is static: `bun run build` writes `dist/`, and an assets-only Cloudflare
-Worker named `dnbm` serves it (`wrangler.jsonc`). `web/_headers` sets the security
-headers, including a content security policy that allows WebAssembly compilation and
-nothing else beyond the site's own files.
+The site is static: `bun run build` writes `dist/`, with the sequencer at its root and
+the player at `/player/`, and an assets-only Cloudflare Worker named `dnbm` serves it
+(`wrangler.jsonc`). `packages/sequencer/_headers` sets the security headers for both,
+including a content security policy that allows WebAssembly compilation and nothing
+else beyond the site's own files.
 
 ## Deploy by hand
 

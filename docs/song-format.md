@@ -12,7 +12,7 @@ designed for source control:
 - **Explicit.** Every value a song can hold is written, defaults included, so a song
   keeps its sound when the defaults change.
 
-`web/src/song/format.ts` is the reference implementation. Every file names the JSON
+`packages/synth/src/song/format.ts` is the reference implementation. Every file names the JSON
 Schema at `https://dnbm.a2f0.net/song.schema.json`, so editors validate and complete
 hand edits.
 
@@ -76,7 +76,7 @@ levels.
 | `pluck` | notes | `tone`, `decay`, `release` s |
 | `pad` | notes | `cutoff` Hz, `resonance`, `interval` semitones, `detune` cents, `attack` s, `env`, `decay` s, `rate` (sweep cycle in sixteenths), `sweep`, `release` s |
 
-Ranges and defaults live in `web/src/song/instruments.ts` and in the schema.
+Ranges and defaults live in `packages/synth/src/song/instruments.ts` and in the schema.
 
 ## Patterns
 
