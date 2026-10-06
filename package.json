@@ -1,6 +1,6 @@
 {
   "name": "@a2f0/dnbm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A dark drum and bass sequencer, mixer and player with a WebAssembly audio engine, ready to embed in a page",
   "license": "UNLICENSED",
   "homepage": "https://dnbm.a2f0.net",
@@ -71,13 +71,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@a2f0/agent-tool": "0.1.4",
+    "@a2f0/agent-tool": "0.1.6",
     "@a2f0/dnbm-synth": "workspace:*",
     "@biomejs/biome": "2.5.15",
     "@tsconfig/strictest": "2.0.8",
     "@types/bun": "1.4.2",
     "playwright-core": "1.63.0",
     "typescript": "7.0.2",
-    "wrangler": "4.147.0"
+    "wrangler": "4.148.0"
   }
 }

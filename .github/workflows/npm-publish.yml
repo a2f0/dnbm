@@ -40,9 +40,9 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c  # v4.3.0
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
-          version: 2026.9.1
+          version: 2026.10.3
           install_args: shellcheck aqua:WebAssembly/binaryen
           cache: true
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2.2.0
@@ -76,9 +76,9 @@ jobs:
       - if: steps.decide.outputs.publish == 'true'
         run: rustup toolchain install
       - if: steps.decide.outputs.publish == 'true'
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c  # v4.3.0
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
-          version: 2026.9.1
+          version: 2026.10.3
           install_args: aqua:WebAssembly/binaryen
           cache: true
       - if: steps.decide.outputs.publish == 'true'
