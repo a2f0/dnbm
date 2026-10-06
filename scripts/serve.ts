@@ -1,6 +1,7 @@
-// Serves dist/ on localhost and rebuilds when sources change: the engine when engine/
-// changes, the page otherwise. Responses carry the production headers from
-// web/_headers, so the content security policy is exercised locally too.
+// Serves dist/ on localhost and rebuilds when sources change: the engine when
+// packages/synth/engine/ changes, the pages otherwise. Responses carry the production
+// headers from packages/sequencer/_headers, so the content security policy is exercised
+// locally too.
 // AudioWorklet needs a secure context: localhost is one, file:// pages are not.
 
 import { watch } from "node:fs";
@@ -9,9 +10,9 @@ import { build, buildEngine, buildWeb, DIST, ROOT } from "./build";
 
 const port = Number(process.env["PORT"] ?? 8174);
 
-/** The headers web/_headers sets for every path ("/*"). */
+/** The headers packages/sequencer/_headers sets for every path ("/*"). */
 async function siteHeaders(): Promise<Record<string, string>> {
-  const text = await Bun.file(join(ROOT, "web", "_headers")).text();
+  const text = await Bun.file(join(ROOT, "packages", "sequencer", "_headers")).text();
   const headers: Record<string, string> = {};
   for (const line of text.split("\n")) {
     const match = /^\s+([\w-]+):\s*(.+)$/.exec(line);
@@ -29,7 +30,11 @@ const server = Bun.serve({
   async fetch(request) {
     // URL parsing resolves "..", and normalize keeps the path inside dist.
     const path = normalize(new URL(request.url).pathname);
-    const name = path === "/" ? "index.html" : extname(path) === "" ? `${path}.html` : path;
+    const name = path.endsWith("/")
+      ? `${path}index.html`
+      : extname(path) === ""
+        ? `${path}.html`
+        : path;
     const file = Bun.file(join(DIST, name));
     return (await file.exists())
       ? new Response(file, { headers })
@@ -56,8 +61,13 @@ function rebuild(engine: boolean): void {
   }, 150);
 }
 
-watch(join(ROOT, "web"), { recursive: true }, () => rebuild(false));
+const ENGINE = join("synth", "engine");
+watch(join(ROOT, "packages"), { recursive: true }, (_event, file) => {
+  // Cargo writes its build output under the engine; only sources trigger a rebuild.
+  if (!file || file.split(/[\\/]/).includes("target") || file.includes("node_modules")) return;
+  rebuild(file.startsWith(ENGINE));
+});
 watch(join(ROOT, "songs"), { recursive: true }, () => rebuild(false));
-watch(join(ROOT, "engine", "src"), { recursive: true }, () => rebuild(true));
 
 console.info(`dnbm: http://localhost:${server.port}`);
+console.info(`player: http://localhost:${server.port}/player/`);

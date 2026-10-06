@@ -3,10 +3,10 @@
 //   bun scripts/render.ts <song.dnbm.json> [out.wav] [--rate 48000] [--loops 1]
 
 import { parseArgs } from "node:util";
-import { renderSong } from "../web/src/audio/offline";
-import { WasmEngine } from "../web/src/audio/wasmEngine";
-import { encodeWav } from "../web/src/audio/wav";
-import { parseSongText } from "../web/src/song/format";
+import { renderSong } from "@a2f0/dnbm-synth/audio/offline";
+import { WasmEngine } from "@a2f0/dnbm-synth/audio/wasmEngine";
+import { encodeWav } from "@a2f0/dnbm-synth/audio/wav";
+import { parseSongText } from "@a2f0/dnbm-synth/song/format";
 import { buildEngine, ENGINE_WASM } from "./build";
 
 const { values, positionals } = parseArgs({

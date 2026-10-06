@@ -1,0 +1,10 @@
+{
+  "name": "@a2f0/dnbm-player",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A dnbm player: a playlist of songs, played through the shared synthesizer",
+  "type": "module",
+  "dependencies": {
+    "@a2f0/dnbm-synth": "workspace:*"
+  }
+}

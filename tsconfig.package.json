@@ -3,10 +3,10 @@
   "compilerOptions": {
     "noEmit": false,
     "outDir": "lib",
-    "rootDir": "web/src/package",
+    "rootDir": "src",
     "declaration": true,
     "target": "ES2023",
     "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
-  "include": ["web/src/package/*.ts"]
+  "include": ["src/*.ts"]
 }

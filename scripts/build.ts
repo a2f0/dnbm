@@ -1,29 +1,33 @@
-// Builds the site into dist/: the engine (cargo, then wasm-opt), the page, worklet and
-// export-worker bundles, the static files, the song schema and the example songs.
+// Builds the site into dist/: the engine (cargo, then wasm-opt), the worklet and
+// export-worker bundles, the sequencer at the root and the player in player/, their
+// static files, the song schema and the example songs. Both apps share one engine.
 //
 //   bun scripts/build.ts            everything
 //   bun scripts/build.ts --engine   just dist/engine.wasm (what the tests load)
 
 import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { parseSongText } from "../web/src/song/format";
-import { songSchema } from "../web/src/song/schema";
+import { parseSongText } from "@a2f0/dnbm-synth/song/format";
+import { songSchema } from "@a2f0/dnbm-synth/song/schema";
 
 export const ROOT = join(import.meta.dir, "..");
 export const DIST = join(ROOT, "dist");
 export const ENGINE_WASM = join(DIST, "engine.wasm");
-const WEB = join(ROOT, "web");
+const SYNTH = join(ROOT, "packages", "synth");
+const SEQUENCER = join(ROOT, "packages", "sequencer");
+const PLAYER = join(ROOT, "packages", "player");
 const SONGS = join(ROOT, "songs");
-const CARGO_MANIFEST = join(ROOT, "engine", "Cargo.toml");
+const CARGO_MANIFEST = join(SYNTH, "engine", "Cargo.toml");
 const CARGO_OUTPUT = join(
-  ROOT,
+  SYNTH,
   "engine",
   "target",
   "wasm32-unknown-unknown",
   "release",
   "dnbm_engine.wasm",
 );
-const STATIC_FILES = ["index.html", "styles.css", "icon.svg", "_headers"];
+const SEQUENCER_FILES = ["index.html", "styles.css", "icon.svg", "_headers"];
+const PLAYER_FILES = ["index.html", "styles.css"];
 
 // Rust's default WebAssembly features. The release profile strips the section that
 // would let wasm-opt detect them, so they are listed here.
@@ -79,14 +83,10 @@ async function buildSongs(): Promise<void> {
   await Bun.write(join(destination, "index.json"), `${JSON.stringify(index, null, 2)}\n`);
 }
 
-export async function buildWeb(): Promise<void> {
+async function bundle(entrypoints: string[], outdir: string): Promise<void> {
   const result = await Bun.build({
-    entrypoints: [
-      join(WEB, "src", "main.ts"),
-      join(WEB, "src", "audio", "worklet.ts"),
-      join(WEB, "src", "audio", "renderWorker.ts"),
-    ],
-    outdir: DIST,
+    entrypoints,
+    outdir,
     naming: "[name].[ext]",
     target: "browser",
     format: "esm",
@@ -94,7 +94,20 @@ export async function buildWeb(): Promise<void> {
     sourcemap: "linked",
   });
   if (!result.success) throw new AggregateError(result.logs, "Web build failed");
-  for (const file of STATIC_FILES) await cp(join(WEB, file), join(DIST, file));
+}
+
+export async function buildWeb(): Promise<void> {
+  await bundle(
+    [
+      join(SEQUENCER, "src", "main.ts"),
+      join(SYNTH, "src", "audio", "worklet.ts"),
+      join(SYNTH, "src", "audio", "renderWorker.ts"),
+    ],
+    DIST,
+  );
+  await bundle([join(PLAYER, "src", "main.ts")], join(DIST, "player"));
+  for (const file of SEQUENCER_FILES) await cp(join(SEQUENCER, file), join(DIST, file));
+  for (const file of PLAYER_FILES) await cp(join(PLAYER, file), join(DIST, "player", file));
   await Bun.write(join(DIST, "song.schema.json"), `${JSON.stringify(songSchema(), null, 2)}\n`);
   await buildSongs();
 }

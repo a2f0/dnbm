@@ -1,0 +1,11 @@
+{
+  "name": "@a2f0/dnbm-synth",
+  "version": "0.0.0",
+  "private": true,
+  "description": "dnbm's synthesizer: the Rust engine, its AudioWorklet host and the song format",
+  "type": "module",
+  "exports": {
+    "./audio/*": "./src/audio/*.ts",
+    "./song/*": "./src/song/*.ts"
+  }
+}

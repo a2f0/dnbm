@@ -1,5 +1,6 @@
-# rustup reads this in engine/ and at the root, and installs the pinned toolchain
-# with the WebAssembly target on first use, locally and in CI.
+# rustup reads this here and in every directory below, packages/synth/engine/ among them,
+# and installs the pinned toolchain with the WebAssembly target on first use, locally and
+# in CI.
 [toolchain]
 channel = "1.98.1"
 targets = ["wasm32-unknown-unknown"]

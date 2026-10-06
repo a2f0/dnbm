@@ -7,7 +7,7 @@
 
 import { readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { parseSongText, SONG_EXTENSION, serializeSong } from "../web/src/song/format";
+import { parseSongText, SONG_EXTENSION, serializeSong } from "@a2f0/dnbm-synth/song/format";
 
 const ROOT = join(import.meta.dir, "..");
 

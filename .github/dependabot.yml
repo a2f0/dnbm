@@ -18,6 +18,6 @@ updates:
         patterns: ["*"]
 
   - package-ecosystem: cargo
-    directory: /engine
+    directory: /packages/synth/engine
     schedule:
       interval: monthly

@@ -31,9 +31,9 @@ step "Checking agent skills"
 bun run --silent agents:check >/dev/null
 
 step "Checking the engine (rustfmt, clippy, cargo test)"
-cargo fmt --manifest-path engine/Cargo.toml --check
-cargo clippy --quiet --manifest-path engine/Cargo.toml --all-targets -- -D warnings
-cargo test --quiet --manifest-path engine/Cargo.toml
+cargo fmt --manifest-path packages/synth/engine/Cargo.toml --check
+cargo clippy --quiet --manifest-path packages/synth/engine/Cargo.toml --all-targets -- -D warnings
+cargo test --quiet --manifest-path packages/synth/engine/Cargo.toml
 
 step "Building the site (engine, wasm-opt, bundles)"
 bun scripts/build.ts >/dev/null

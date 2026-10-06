@@ -38,6 +38,15 @@ song playback turns follow off so you can edit ahead. Muted channels and channel
 excluded by solo dim in the mixer. The master holds its highest peak in dBFS; click
 that reading to reset it, or start playback for a fresh reading.
 
+## Player
+
+[dnbm.a2f0.net/player/](https://dnbm.a2f0.net/player/) plays the example songs as a
+playlist, after the desktop players of old: elapsed or remaining time, a spectrum,
+seek, shuffle, repeat and volume, with Z, X, C, V and B for previous, play, pause, stop
+and next. It plays through the same engine as the editor and edits nothing. Other pages
+embed it with `mountDnbmPlayer` from the package, passing any list of song files as
+the playlist.
+
 ## Songs
 
 Songs are `.dnbm.json` files. Each pattern row is one line, so changing a step changes
@@ -72,6 +81,9 @@ await copyDnbmAssets("./public/dnbm");
 
 import { mountDnbm } from "@a2f0/dnbm";              // in the browser
 const dnbm = mountDnbm(container, { assetsUrl: "/dnbm/" });
+
+import { mountDnbmPlayer } from "@a2f0/dnbm";        // or just the player
+const player = mountDnbmPlayer(container, { assetsUrl: "/dnbm/", songs });
 ```
 
 [The package guide](docs/package.md) covers embedding and releases.
@@ -80,8 +92,11 @@ const dnbm = mountDnbm(container, { assetsUrl: "/dnbm/" });
 
 | Path | What |
 | --- | --- |
-| `engine/` | The audio engine in Rust: sequencer, instruments, mixer, effects |
-| `web/` | The editor (TypeScript and DOM), the AudioWorklet, and the song format |
+| `packages/synth/` | The shared synthesizer: the Rust audio engine (`engine/`), its AudioWorklet host, and the song format |
+| `packages/sequencer/` | The editor and mixer (TypeScript and DOM) |
+| `src/` | The npm package's entrypoints: `mountDnbm`, `mountDnbmPlayer`, `copyDnbmAssets` |
+| `packages/player/` | A playlist player that plays songs through the same synthesizer |
+| `test/` | Repository-wide tests: the packed npm package, and the greys-only rule |
 | `songs/` | Example songs |
 | `scripts/` | Build, dev server, WAV render, song formatter, git hooks and checks |
 | `docs/` | [Song format](docs/song-format.md), [architecture](docs/architecture.md), [package](docs/package.md), [deploying](docs/deploying.md) |

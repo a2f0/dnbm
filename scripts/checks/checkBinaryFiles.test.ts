@@ -51,9 +51,9 @@ function repository() {
 describe("binary file guard", () => {
   test("allows text: code, songs and SVG", () => {
     const repo = repository();
-    repo.write("web/src/main.ts", "export {};\n");
+    repo.write("packages/player/src/main.ts", "export {};\n");
     repo.write("songs/song.dnbm.json", '{ "dnbm": 1 }\n');
-    repo.write("web/icon.svg", "<svg></svg>\n");
+    repo.write("packages/sequencer/icon.svg", "<svg></svg>\n");
     repo.git("add", "-A");
     expect(repo.guard("--staged")).toBe(0);
     expect(repo.guard("--all")).toBe(0);

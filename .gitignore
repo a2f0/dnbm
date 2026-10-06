@@ -9,7 +9,7 @@ lib/
 site/
 
 # Cargo
-engine/target/
+packages/synth/engine/target/
 
 # Renders (bun run render)
 *.wav
