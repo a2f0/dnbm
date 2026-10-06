@@ -6,6 +6,7 @@ import { INSTRUMENTS } from "../song/instruments";
 import { ID_PATTERN, MAX_PATTERNS, type Song } from "../song/model";
 import { DRUM_REST, emptyRow, MAX_BARS, REST, STEPS_PER_BAR } from "../song/notation";
 import type { View } from "../view";
+import { confirmDialog, promptDialog } from "./dialog";
 import { h, setClass } from "./dom";
 
 export class PatternBar {
@@ -23,7 +24,7 @@ export class PatternBar {
       const tab = (event.target as HTMLElement).closest<HTMLElement>("[data-pattern]");
       if (tab?.dataset["pattern"]) app.selectPattern(tab.dataset["pattern"]);
     });
-    this.tabs.addEventListener("dblclick", () => this.rename());
+    this.tabs.addEventListener("dblclick", () => void this.rename());
 
     const action = (text: string, title: string, run: () => void) => {
       const button = h("button", { text, title });
@@ -73,8 +74,12 @@ export class PatternBar {
         h("div", { class: "pattern-actions" }, [
           action("+", "New pattern", () => this.add()),
           action("dup", "Duplicate this pattern", () => this.duplicate()),
-          action("rename", "Rename this pattern (or double-click its tab)", () => this.rename()),
-          action("del", "Delete this pattern", () => this.remove()),
+          action(
+            "rename",
+            "Rename this pattern (or double-click its tab)",
+            () => void this.rename(),
+          ),
+          action("del", "Delete this pattern", () => void this.remove()),
           h("div", { class: "segmented", role: "group", "aria-label": "Bars" }, this.bars),
         ]),
       ]),
@@ -163,9 +168,11 @@ export class PatternBar {
     this.app.selectPattern(id);
   }
 
-  private rename(): void {
+  private async rename(): Promise<void> {
     const old = this.app.pattern().id;
-    const id = prompt("Pattern id (lowercase letters, digits, hyphens):", old)?.trim();
+    const id = (
+      await promptDialog("Pattern id (lowercase letters, digits, hyphens):", old, "rename")
+    )?.trim();
     if (!id || id === old) return;
     if (!ID_PATTERN.test(id) || this.app.song.patterns.some((pattern) => pattern.id === id)) {
       this.app.say(`"${id}" isn't a free pattern id.`, true);
@@ -178,14 +185,15 @@ export class PatternBar {
     this.app.selectPattern(id);
   }
 
-  private remove(): void {
+  private async remove(): Promise<void> {
     const { song } = this.app;
     const id = this.app.pattern().id;
     if (song.patterns.length === 1) {
       this.app.say("A song needs at least one pattern.", true);
       return;
     }
-    if (!confirm(`Delete pattern "${id}" and its slots in the song?`)) return;
+    if (!(await confirmDialog(`Delete pattern "${id}" and its slots in the song?`, "delete")))
+      return;
     this.app.edit((draft) => {
       draft.patterns = draft.patterns.filter((pattern) => pattern.id !== id);
       draft.arrangement = draft.arrangement.filter((slot) => slot !== id);

@@ -20,7 +20,9 @@ Rust comes from rustup, which installs the toolchain in `rust-toolchain.toml`.
 ## Validation
 
 `bun run check` (`scripts/checks/checkAll.sh`) is the full local gate; the pre-push
-hook runs it, and CI runs the same checks. While iterating:
+hook runs it, and CI runs the same checks. The package test embeds the packed app in a
+cross-origin frame in Google Chrome (through `playwright-core`), so checks need Chrome
+installed, as GitHub's runners have. While iterating:
 
 ```sh
 bun run engine:check                 # rustfmt, clippy -D warnings, cargo test
@@ -43,6 +45,9 @@ song with the same engine, for checking sound changes offline.
 - No binary files in Git (`scripts/checks/checkBinaryFiles.sh`). Every sound is
   synthesized; there are no samples to commit.
 - Every colour is a grey with equal red, green and blue (`web/test/grayscale.test.ts`).
+- The app runs embedded in other pages (`@a2f0/dnbm`), so don't use `window.confirm`,
+  `prompt` or `alert`, which browsers block in cross-origin frames: use
+  `web/src/ui/dialog.ts`. Anything a frame may refuse needs a fallback.
 - The sound is dark: minor keys, low filter cutoffs and dark reverb by default. Keep new
   defaults and example songs in that spirit.
 - Songs are canonical (`bun run songs:fmt`). Never hand-format a `.dnbm.json` file, and

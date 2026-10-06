@@ -134,7 +134,7 @@ export class Transport {
       ]),
       scope.element,
       h("nav", { class: "files", "aria-label": "Song" }, [
-        button("new", "New song", () => app.newSong()),
+        button("new", "New song", () => void app.newSong()),
         button("open", "Open a song file (⌘O)", () => void app.open()),
         button(
           "save",

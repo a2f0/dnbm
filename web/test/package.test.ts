@@ -7,6 +7,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { type Browser, chromium, type Frame, type Page } from "playwright-core";
 import { buildPackage } from "../../scripts/buildPackage";
 
 const ROOT = join(import.meta.dir, "..", "..");
@@ -212,5 +213,104 @@ console.log(JSON.stringify({ dom: typeof document, mount: typeof mountDnbm, copy
     expect([frame.src, frame.title]).toEqual(["https://example.com/dnbm/index.html", "dnbm"]);
     expect(() => mountDnbm(container, { assetsUrl: "file:///dnbm/" })).toThrow("HTTP or HTTPS");
     expect(() => mountDnbm(container, { assetsUrl: "/dnbm/?v=1" })).toThrow("without a query");
+  });
+});
+
+/** Serves a directory over HTTP, mapping directory URLs to their index.html. */
+function serveDirectory(directory: string, hostname: string) {
+  return Bun.serve({
+    hostname,
+    port: 0,
+    fetch: (request) => {
+      const path = new URL(request.url).pathname;
+      const file = Bun.file(join(directory, path.endsWith("/") ? `${path}index.html` : path));
+      return file.size > 0 ? new Response(file) : new Response("Not found", { status: 404 });
+    },
+  });
+}
+
+// The packaged app in a real browser, in a cross-origin frame: the strictest place a
+// host can embed it, where browsers refuse native dialogs and file pickers. Needs
+// Google Chrome, as on GitHub's runners.
+describe("the packaged app embedded in a cross-origin frame", () => {
+  let browser: Browser;
+  let page: Page;
+  let frame: Frame;
+  let servers: { stop: (force?: boolean) => Promise<void> }[] = [];
+
+  beforeAll(async () => {
+    const assets = join(temporary, "cross-origin-assets");
+    const host = join(temporary, "cross-origin-host");
+    const { copyDnbmAssets } = (await import(
+      pathToFileURL(join(installed, "lib", "build.js")).href
+    )) as {
+      copyDnbmAssets: (destination: string) => Promise<void>;
+    };
+    await copyDnbmAssets(join(assets, "dnbm"));
+    await mkdir(host, { recursive: true });
+    await writeFile(join(host, "dnbm.js"), await readFile(join(installed, "lib", "index.js")));
+    const assetServer = serveDirectory(assets, "localhost");
+    await writeFile(
+      join(host, "index.html"),
+      `<!doctype html><meta charset="utf-8"><title>host</title>
+<div id="window" style="width:1200px;height:800px"></div>
+<script type="module">
+  import { mountDnbm } from "/dnbm.js";
+  window.dnbm = mountDnbm(document.getElementById("window"), { assetsUrl: "${new URL("/dnbm/", assetServer.url).href}" });
+</script>`,
+    );
+    const hostServer = serveDirectory(host, "127.0.0.1");
+    servers = [assetServer, hostServer];
+    // No autoplay override: audio must start from a click inside the frame.
+    browser = await chromium.launch({ channel: "chrome", headless: true });
+    page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1280, height: 860 } });
+    await page.goto(hostServer.url.href);
+    const element = await page.waitForSelector("iframe");
+    const content = await element.contentFrame();
+    if (!content) throw new Error("the iframe has no content frame");
+    frame = content;
+    await frame.waitForSelector(".cell");
+  }, 60_000);
+
+  afterAll(async () => {
+    await browser?.close();
+    for (const server of servers) await server.stop(true);
+  });
+
+  test("loads embedded, without the wordmark", async () => {
+    expect(new URL(frame.url()).searchParams.get("embed")).toBe("1");
+    expect(await frame.locator(".brand").isVisible()).toBe(false);
+  });
+
+  test("starts audio from a click in the frame", async () => {
+    await frame.click(".play");
+    // The playhead moves only when the worklet reports steps from the running engine.
+    await frame.waitForSelector(".cell.now", { timeout: 10_000 });
+    await frame.click(".play");
+  }, 20_000);
+
+  test("asks before discarding edits with an in-app dialog", async () => {
+    await frame.locator('.grid-row[data-track="0"] .cell').nth(1).click();
+    await frame.click('button:text-is("new")');
+    const dialog = frame.locator("dialog[open]");
+    await dialog.waitFor();
+    expect(await dialog.textContent()).toContain("Discard unsaved changes");
+    await dialog.locator('button:text-is("discard")').click();
+    await frame.waitForFunction(
+      () => document.querySelector<HTMLInputElement>(".title")?.value === "Untitled",
+    );
+  }, 20_000);
+
+  test("saves by downloading when the frame may not show a file picker", async () => {
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      frame.click('button:text-is("save")'),
+    ]);
+    expect(download.suggestedFilename()).toBe("untitled.dnbm.json");
+  }, 20_000);
+
+  test("destroy removes the frame", async () => {
+    await page.evaluate(() => (window as unknown as { dnbm: { destroy(): void } }).dnbm.destroy());
+    expect(await page.locator("iframe").count()).toBe(0);
   });
 });

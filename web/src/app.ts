@@ -9,6 +9,7 @@ import { INSTRUMENTS } from "./song/instruments";
 import type { Pattern, Song, Track } from "./song/model";
 import { type ChangeSource, SongStore } from "./store";
 import { DevicePanel } from "./ui/device";
+import { confirmDialog } from "./ui/dialog";
 import { h, isTyping } from "./ui/dom";
 import { download, openSongFile, saveSongFile, songFileName } from "./ui/files";
 import { Grid } from "./ui/grid";
@@ -293,12 +294,14 @@ export class App {
     this.store.load(song, text);
   }
 
-  private confirmDiscard(): boolean {
-    return !this.store.dirty || confirm("Discard unsaved changes to this song?");
+  private async confirmDiscard(): Promise<boolean> {
+    return (
+      !this.store.dirty || (await confirmDialog("Discard unsaved changes to this song?", "discard"))
+    );
   }
 
-  newSong(): void {
-    if (!this.confirmDiscard()) return;
+  async newSong(): Promise<void> {
+    if (!(await this.confirmDiscard())) return;
     this.load(newSong(), undefined, undefined);
     this.say("New song.");
   }
@@ -315,7 +318,7 @@ export class App {
   }
 
   async open(): Promise<void> {
-    if (!this.confirmDiscard()) return;
+    if (!(await this.confirmDiscard())) return;
     try {
       const file = await openSongFile();
       if (file) this.openText(file.text, file.name, file.handle);
@@ -325,7 +328,7 @@ export class App {
   }
 
   async openExample(file: string): Promise<void> {
-    if (!this.confirmDiscard()) return;
+    if (!(await this.confirmDiscard())) return;
     try {
       const response = await fetch(`songs/${file}`);
       if (!response.ok) throw new Error(`${response.status}`);
@@ -381,6 +384,8 @@ export class App {
 
   /** The action a key press triggers, if any. Typing in a field keeps undo and space. */
   private shortcut(event: KeyboardEvent): (() => void) | undefined {
+    // A modal dialog (ui/dialog.ts) owns the keyboard: Space presses its buttons.
+    if (document.querySelector("dialog[open]")) return undefined;
     const command = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
     const typing = isTyping(event.target);
@@ -405,7 +410,7 @@ export class App {
     window.addEventListener("drop", async (event) => {
       event.preventDefault();
       const file = event.dataTransfer?.files[0];
-      if (file && this.confirmDiscard()) this.openText(await file.text(), file.name);
+      if (file && (await this.confirmDiscard())) this.openText(await file.text(), file.name);
     });
   }
 }

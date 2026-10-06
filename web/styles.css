@@ -738,6 +738,38 @@ input {
   background: var(--bright);
 }
 
+/* In-app confirmations and prompts (web/src/ui/dialog.ts). */
+.dialog {
+  min-width: min(360px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.dialog-message {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.dialog-accept {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--bg);
+}
+
 .statusbar {
   display: flex;
   gap: 16px;
