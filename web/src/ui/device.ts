@@ -12,6 +12,7 @@ import { ID_PATTERN, type Song } from "../song/model";
 import { convertRow } from "../song/notation";
 import type { View } from "../view";
 import { ParamControl } from "./control";
+import { confirmDialog } from "./dialog";
 import { h, setText } from "./dom";
 
 export class DevicePanel {
@@ -75,7 +76,7 @@ export class DevicePanel {
         h("div", { class: "device-actions" }, [
           action("↑", "Move track up", () => this.move(-1)),
           action("↓", "Move track down", () => this.move(1)),
-          action("del", "Delete track", () => this.remove()),
+          action("del", "Delete track", () => void this.remove()),
         ]),
       ]),
       this.description,
@@ -177,9 +178,10 @@ export class DevicePanel {
     });
   }
 
-  private remove(): void {
+  private async remove(): Promise<void> {
     const id = this.app.view.trackId;
-    if (!confirm(`Delete track "${id}" and its steps in every pattern?`)) return;
+    if (!(await confirmDialog(`Delete track "${id}" and its steps in every pattern?`, "delete")))
+      return;
     this.app.edit((song) => {
       song.tracks = song.tracks.filter((track) => track.id !== id);
       for (const pattern of song.patterns) delete pattern.rows[id];

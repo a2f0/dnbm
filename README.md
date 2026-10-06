@@ -47,6 +47,21 @@ bun run songs:fmt                         # rewrite songs/ canonically
 bun run songs:check                       # fail on an invalid or non-canonical song
 ```
 
+## Package
+
+dnbm is also published to npm as [`@a2f0/dnbm`](https://www.npmjs.com/package/@a2f0/dnbm),
+to embed the whole app in another page or app, such as a mini-app window:
+
+```ts
+import { copyDnbmAssets } from "@a2f0/dnbm/build";   // in a build script
+await copyDnbmAssets("./public/dnbm");
+
+import { mountDnbm } from "@a2f0/dnbm";              // in the browser
+const dnbm = mountDnbm(container, { assetsUrl: "/dnbm/" });
+```
+
+[The package guide](docs/package.md) covers embedding and releases.
+
 ## Layout
 
 | Path | What |
@@ -55,12 +70,12 @@ bun run songs:check                       # fail on an invalid or non-canonical 
 | `web/` | The editor (TypeScript and DOM), the AudioWorklet, and the song format |
 | `songs/` | Example songs |
 | `scripts/` | Build, dev server, WAV render, song formatter, git hooks and checks |
-| `docs/` | [Song format](docs/song-format.md), [architecture](docs/architecture.md), [deploying](docs/deploying.md) |
+| `docs/` | [Song format](docs/song-format.md), [architecture](docs/architecture.md), [package](docs/package.md), [deploying](docs/deploying.md) |
 
 ## Development
 
 ```sh
-bun run check   # everything CI checks; the pre-push hook runs it too
+bun run check   # everything CI checks; the pre-push hook runs it too; needs Google Chrome
 bun run test    # build the engine, then the TypeScript tests
 bun run engine:check   # rustfmt, clippy and cargo test
 bun run fix     # format TypeScript, Rust and songs

@@ -9,6 +9,7 @@ import { INSTRUMENTS } from "./song/instruments";
 import type { Pattern, Song, Track } from "./song/model";
 import { type ChangeSource, SongStore } from "./store";
 import { DevicePanel } from "./ui/device";
+import { confirmDialog } from "./ui/dialog";
 import { h, isTyping } from "./ui/dom";
 import { download, openSongFile, saveSongFile, songFileName } from "./ui/files";
 import { Grid } from "./ui/grid";
@@ -20,7 +21,6 @@ import type { View } from "./view";
 
 export const AUTOSAVE_KEY = "dnbm:song";
 export const SAVED_KEY = "dnbm:saved";
-const AUTOSAVE_DELAY = 400;
 
 /** Reads browser storage, which can throw (private windows, blocked storage). */
 export function readStorage(key: string): string | null {
@@ -45,7 +45,6 @@ export class App {
   private host: EngineHost | undefined;
   private starting: Promise<EngineHost | undefined> | undefined;
   private syncQueued = false;
-  private autosaveTimer: ReturnType<typeof setTimeout> | undefined;
   private fileHandle: FileSystemFileHandle | undefined;
   private fileName: string | undefined;
   private readonly transport: Transport;
@@ -153,7 +152,7 @@ export class App {
     view.startSlot = Math.min(view.startSlot, song.arrangement.length - 1);
     if (source === "load") view.cursor = undefined;
     this.queueSync();
-    this.queueAutosave();
+    this.autosave();
     this.render();
   }
 
@@ -178,12 +177,13 @@ export class App {
     });
   }
 
-  private queueAutosave(): void {
-    clearTimeout(this.autosaveTimer);
-    this.autosaveTimer = setTimeout(() => {
-      writeStorage(AUTOSAVE_KEY, serializeSong(this.song));
-      writeStorage(SAVED_KEY, this.store.saved);
-    }, AUTOSAVE_DELAY);
+  /**
+   * Saves the song to local storage on every change, never later: an embedding host
+   * can remove the app's frame at any moment, and a delayed write would be lost.
+   */
+  private autosave(): void {
+    writeStorage(AUTOSAVE_KEY, serializeSong(this.song));
+    writeStorage(SAVED_KEY, this.store.saved);
   }
 
   /** Starts the audio engine on first use; browsers only allow it after a gesture. */
@@ -293,12 +293,14 @@ export class App {
     this.store.load(song, text);
   }
 
-  private confirmDiscard(): boolean {
-    return !this.store.dirty || confirm("Discard unsaved changes to this song?");
+  private async confirmDiscard(): Promise<boolean> {
+    return (
+      !this.store.dirty || (await confirmDialog("Discard unsaved changes to this song?", "discard"))
+    );
   }
 
-  newSong(): void {
-    if (!this.confirmDiscard()) return;
+  async newSong(): Promise<void> {
+    if (!(await this.confirmDiscard())) return;
     this.load(newSong(), undefined, undefined);
     this.say("New song.");
   }
@@ -315,7 +317,7 @@ export class App {
   }
 
   async open(): Promise<void> {
-    if (!this.confirmDiscard()) return;
+    if (!(await this.confirmDiscard())) return;
     try {
       const file = await openSongFile();
       if (file) this.openText(file.text, file.name, file.handle);
@@ -325,7 +327,7 @@ export class App {
   }
 
   async openExample(file: string): Promise<void> {
-    if (!this.confirmDiscard()) return;
+    if (!(await this.confirmDiscard())) return;
     try {
       const response = await fetch(`songs/${file}`);
       if (!response.ok) throw new Error(`${response.status}`);
@@ -346,7 +348,7 @@ export class App {
       this.fileHandle = handle;
       this.fileName = handle?.name ?? name;
       this.store.markSaved(text);
-      this.queueAutosave();
+      this.autosave();
       this.render();
       this.say(handle ? `Saved ${this.fileName}.` : `Downloaded ${name}.`);
     } catch (error) {
@@ -381,6 +383,8 @@ export class App {
 
   /** The action a key press triggers, if any. Typing in a field keeps undo and space. */
   private shortcut(event: KeyboardEvent): (() => void) | undefined {
+    // A modal dialog (ui/dialog.ts) owns the keyboard: Space presses its buttons.
+    if (document.querySelector("dialog[open]")) return undefined;
     const command = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
     const typing = isTyping(event.target);
@@ -405,7 +409,7 @@ export class App {
     window.addEventListener("drop", async (event) => {
       event.preventDefault();
       const file = event.dataTransfer?.files[0];
-      if (file && this.confirmDiscard()) this.openText(await file.text(), file.name);
+      if (file && (await this.confirmDiscard())) this.openText(await file.text(), file.name);
     });
   }
 }

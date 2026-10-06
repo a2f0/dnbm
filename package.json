@@ -1,15 +1,56 @@
 {
-  "name": "dnbm",
-  "private": true,
+  "name": "@a2f0/dnbm",
+  "version": "0.1.0",
+  "description": "A dark drum and bass sequencer and mixer with a WebAssembly audio engine, ready to embed in a page",
   "license": "UNLICENSED",
+  "homepage": "https://dnbm.a2f0.net",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a2f0/dnbm.git"
+  },
+  "keywords": [
+    "drum and bass",
+    "sequencer",
+    "synthesizer",
+    "webassembly",
+    "audioworklet"
+  ],
   "type": "module",
   "packageManager": "bun@1.4.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "files": [
+    "lib/",
+    "site/",
+    "docs/package.md",
+    "docs/song-format.md"
+  ],
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    },
+    "./build": {
+      "types": "./lib/build.d.ts",
+      "import": "./lib/build.js"
+    },
+    "./assets/*": "./site/*",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "agent-tool": "agent-tool",
     "agents:check": "agent-tool skills check",
     "agents:sync": "agent-tool skills install --apply",
     "build": "bun scripts/build.ts",
     "build:engine": "bun scripts/build.ts --engine",
+    "build:package": "bun scripts/buildPackage.ts",
     "check": "sh scripts/checks/checkAll.sh",
     "deploy": "bun run build && wrangler deploy",
     "dev": "bun scripts/serve.ts",
@@ -18,6 +59,8 @@
     "hooks:install": "sh scripts/git/install-hooks.sh",
     "lint": "biome ci",
     "lint:binary-files": "sh scripts/checks/checkBinaryFiles.sh",
+    "prepack": "bun run build:package",
+    "prepublishOnly": "bun run check",
     "render": "bun scripts/render.ts",
     "songs:check": "bun scripts/songs.ts check",
     "songs:fmt": "bun scripts/songs.ts fmt",
@@ -29,6 +72,7 @@
     "@biomejs/biome": "2.5.15",
     "@tsconfig/strictest": "2.0.8",
     "@types/bun": "1.4.2",
+    "playwright-core": "1.63.0",
     "typescript": "7.0.2",
     "wrangler": "4.147.0"
   }

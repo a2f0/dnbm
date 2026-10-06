@@ -17,6 +17,11 @@ function initialSong(): { song: Song; saved: string | undefined } {
   return { song: parseSong(undertow), saved: undefined };
 }
 
+// mountDnbm (web/src/package) asks for embed mode, where the host already names the app.
+if (new URLSearchParams(location.search).has("embed")) {
+  document.documentElement.dataset["embed"] = "";
+}
+
 const root = document.getElementById("app");
 if (root) {
   const { song, saved } = initialSong();
