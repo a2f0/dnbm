@@ -6,6 +6,7 @@ import { PlayMode } from "../src/audio/wasmEngine";
 import { compileSong } from "../src/song/compile";
 import { parseSong, parseSongText } from "../src/song/format";
 import { expectedEngineDescription } from "../src/song/instruments";
+import type { Song } from "../src/song/model";
 import { createEngine } from "./engineWasm";
 
 const SONGS = join(import.meta.dir, "..", "..", "songs");
@@ -19,6 +20,34 @@ const fourOnTheFloor = parseSong({
   patterns: [{ id: "a", rows: { kick: "X... X... X... X..." } }],
   arrangement: ["a"],
 });
+
+/** A held pad note, a legato change, a release, a retrigger and a rest to ring out in. */
+const padNotes = parseSong({
+  dnbm: 1,
+  bpm: 170,
+  tracks: [{ id: "pad", instrument: "pad", params: { attack: 0.05, release: 0.3 } }],
+  patterns: [
+    {
+      id: "a",
+      rows: { pad: "F-2 --- --- ---  G#2 --- --- ...  ... F-2 --- ---  ... ... ... ..." },
+    },
+  ],
+  arrangement: ["a"],
+});
+
+/** Renders `frames` of a song's arrangement in blocks of `size` frames. */
+async function renderInBlocks(song: Song, size: number, frames: number): Promise<Float32Array> {
+  const engine = await createEngine();
+  engine.loadSong(compileSong(song));
+  engine.play(PlayMode.Song, 0);
+  const out = new Float32Array(frames);
+  for (let offset = 0; offset < out.length; ) {
+    const block = engine.render(Math.min(size, out.length - offset));
+    out.set(block.left, offset);
+    offset += block.frames;
+  }
+  return out;
+}
 
 function hash(...channels: Float32Array[]): number {
   let h = 2166136261;
@@ -72,20 +101,19 @@ describe("engine", () => {
   });
 
   test("renders the same whatever the block size", async () => {
-    const blocks = async (size: number) => {
-      const engine = await createEngine();
-      engine.loadSong(compileSong(fourOnTheFloor));
-      engine.play(PlayMode.Song, 0);
-      const out = new Float32Array(48_000);
-      for (let offset = 0; offset < out.length; ) {
-        const block = engine.render(Math.min(size, out.length - offset));
-        out.set(block.left, offset);
-        offset += block.frames;
-      }
-      return hash(out);
-    };
+    const blocks = async (size: number) => hash(await renderInBlocks(fourOnTheFloor, size, 48_000));
     expect(await blocks(128)).toBe(await blocks(4096));
     expect(await blocks(441)).toBe(await blocks(128));
+  });
+
+  test("renders pad notes identically every time and whatever the block size", async () => {
+    // Two seconds: the held note, its legato change, release, retrigger and tail, then the loop.
+    const first = await renderInBlocks(padNotes, 128, 96_000);
+    expect(first.some((sample) => sample !== 0)).toBe(true);
+    expect(first.every((sample) => Number.isFinite(sample))).toBe(true);
+    expect(hash(first)).toBe(hash(await renderInBlocks(padNotes, 128, 96_000)));
+    expect(hash(first)).toBe(hash(await renderInBlocks(padNotes, 4096, 96_000)));
+    expect(hash(first)).toBe(hash(await renderInBlocks(padNotes, 441, 96_000)));
   });
 
   test("plays steps on time: four kicks a bar at 120 BPM are half a second apart", async () => {
