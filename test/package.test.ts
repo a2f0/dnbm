@@ -973,6 +973,53 @@ describe("the packaged app mounted in a host page", () => {
     expect(errors).toEqual([]);
   }, 30_000);
 
+  test("a save the host's destroy interrupts leaves the file as it was", async () => {
+    // A picker answered at once, writing to a file whose write finishes when the test says.
+    await page.evaluate(() => {
+      const host = window as unknown as HostWindow & {
+        finishWrite?: () => void;
+        file?: string[];
+      };
+      host.file = [];
+      Object.defineProperty(window, "showSaveFilePicker", {
+        configurable: true,
+        value: async () => ({
+          name: "chosen.dnbm.json",
+          createWritable: async () => ({
+            write: () =>
+              new Promise<void>((resolve) => {
+                host.finishWrite = resolve;
+              }),
+            close: async () => host.file?.push("closed"),
+            abort: async () => host.file?.push("aborted"),
+          }),
+        }),
+      });
+    });
+    try {
+      await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+      await sequencer.locator('.files button:text-is("save")').click();
+      await page.waitForFunction(
+        () => (window as unknown as { finishWrite?: unknown }).finishWrite !== undefined,
+      );
+      await page.evaluate(() => {
+        (window as unknown as HostWindow).sequencerApp?.destroy();
+        (window as unknown as { finishWrite(): void }).finishWrite();
+      });
+      await page.waitForTimeout(300);
+      expect(await page.evaluate(() => (window as unknown as { file: string[] }).file)).toEqual([
+        "aborted",
+      ]);
+    } finally {
+      await page.evaluate(() =>
+        Object.defineProperty(window, "showSaveFilePicker", {
+          configurable: true,
+          value: undefined,
+        }),
+      );
+    }
+  }, 20_000);
+
   test("destroying the app while its audio starts closes the audio context", async () => {
     await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
     const requested = Promise.withResolvers<void>();

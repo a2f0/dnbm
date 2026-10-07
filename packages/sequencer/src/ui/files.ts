@@ -103,11 +103,13 @@ export async function saveSongFile(
     return undefined;
   }
   const writable = await target.createWritable();
+  // A save the app's going interrupts is discarded, as a removed frame's would be: the
+  // file keeps what it held.
+  if (!signal.aborted) await writable.write(text);
   if (signal.aborted) {
     await writable.abort();
     return null;
   }
-  await writable.write(text);
   await writable.close();
   return target;
 }
