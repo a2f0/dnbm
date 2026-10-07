@@ -79,5 +79,8 @@
     "playwright-core": "1.63.0",
     "typescript": "7.0.2",
     "wrangler": "4.148.0"
+  },
+  "overrides": {
+    "sharp": "0.35.5"
   }
 }

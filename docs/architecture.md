@@ -131,3 +131,13 @@ what is left of a ring-out.
 Every colour is a grey: `test/grayscale.test.ts` refuses any colour whose red,
 green and blue differ. Brightness carries meaning: brighter is louder, selected, or
 playing.
+
+## Tooling dependencies
+
+The root's exact `sharp` override upgrades Miniflare's image decoder to 0.35.5,
+whose prebuilt libvips includes librsvg 2.63.2 and fixes
+[GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
+Wrangler 4.148.0 pins Miniflare to a release that still requests sharp 0.35.4.
+This patch keeps the same Node requirement and image API; the override affects
+development tooling, not the published app. Remove it once Wrangler's Miniflare
+dependency includes the fix, then run `bun audit` and `bun run check` again.

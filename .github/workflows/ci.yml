@@ -65,6 +65,9 @@ jobs:
       - name: Check agent skills
         run: bun run agents:check
 
+      - name: Audit dependencies
+        run: bun audit
+
   engine:
     name: Engine
     runs-on: ubuntu-latest

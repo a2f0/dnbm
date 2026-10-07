@@ -30,6 +30,9 @@ bunx --no-install tsc -p tsconfig.json
 step "Checking agent skills"
 bun run --silent agents:check >/dev/null
 
+step "Auditing dependencies"
+bun audit
+
 step "Checking the engine (rustfmt, clippy, cargo test)"
 cargo fmt --manifest-path packages/synth/engine/Cargo.toml --check
 cargo clippy --quiet --manifest-path packages/synth/engine/Cargo.toml --all-targets -- -D warnings

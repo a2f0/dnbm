@@ -41,6 +41,7 @@ policy, so checks need Chrome installed, as GitHub's runners have. While iterati
 bun run engine:check                 # rustfmt, clippy -D warnings, cargo test
 bun run test                         # build the engine, then bun test
 bun run typecheck && bunx biome ci   # TypeScript and Biome
+bun audit                            # package security advisories
 bun run songs:check                  # songs are valid and canonical
 bun run lint:binary-files            # no binary files since upstream (or pass --staged, --all)
 bun run build:package                # the npm package, into lib/ and site/
