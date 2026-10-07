@@ -6,15 +6,43 @@
 // The app modules (packages/sequencer/src/mount.ts and packages/player/src/mount.ts,
 // built to mount.js and player/mount.js) implement `AppModule`. They render only inside
 // the root they are given, resolve every URL from `AppContext.assets`, and release what
-// they hold when `AppContext.signal` aborts.
+// they hold when `AppContext.signal` aborts. They publish their state through
+// `AppContext.onState` and take the host's commands through the `AppControl` they
+// return; the shell keeps both to the instance's lifetime (src/control.ts).
+
+import {
+  type DnbmPlayerCommand,
+  type DnbmPlayerState,
+  type DnbmSequencerCommand,
+  type DnbmSequencerState,
+  isCommand,
+  PLAYER_COMMANDS,
+  PLAYER_IDLE,
+  SEQUENCER_COMMANDS,
+  SEQUENCER_IDLE,
+  StateChannel,
+} from "./control.js";
 
 /** What an app module exports. */
 export interface AppModule {
   /**
-   * Renders the app into `root`, whose stylesheet has loaded, and settles once it shows:
-   * a rejection is a failure to start, which the shell reports in `root`.
+   * Renders the app into `root`, whose stylesheet has loaded, and settles once it shows
+   * with the control the host's commands go through: a rejection is a failure to start,
+   * which the shell reports in `root`.
    */
-  mount(root: ShadowRoot, context: AppContext): Promise<void> | void;
+  mount(
+    root: ShadowRoot,
+    context: AppContext,
+  ): Promise<AppControl | undefined> | AppControl | undefined;
+}
+
+/** How a mounted app takes the host's commands. */
+export interface AppControl {
+  /**
+   * Carries out one of the app's commands, as its button or shortcut would, if it is
+   * available now, and says whether it did. Only called while the app lives.
+   */
+  run(command: string): boolean;
 }
 
 export interface AppContext {
@@ -28,10 +56,20 @@ export interface AppContext {
   readonly signal: AbortSignal;
   /** The host names the app, so it hides its wordmark and fills its container. */
   readonly embed: boolean;
+  /**
+   * The app shows its own buttons for its commands. False when the host shows them, as
+   * in its window's menus and toolbar: the app then leaves them out. Undefined is true.
+   */
+  readonly actions?: boolean | undefined;
   /** The player's playlist, as absolute URLs; undefined for every example song. */
   readonly songs?: readonly string[] | undefined;
   /** Receives the title the app gives its page as it changes, as "● Undertow · dnbm". */
   readonly onTitle?: ((title: string) => void) | undefined;
+  /**
+   * Receives the app's state (`DnbmSequencerState` or `DnbmPlayerState`) whenever it may
+   * have changed; the shell keeps it, and tells the host only of real changes.
+   */
+  readonly onState?: ((state: object) => void) | undefined;
 }
 
 /** A mounted app. */
@@ -44,37 +82,90 @@ export interface DnbmInstance {
   readonly element: HTMLElement;
   /**
    * Resolves once the app shows, styled and laid out; replaces an iframe's `load` event.
-   * Rejects when the app can't start, as when its assets fail to load, and the element
-   * then says why. Stays pending if the instance is destroyed first.
+   * Its commands and state are live from then on. Rejects when the app can't start, as
+   * when its assets fail to load, and the element then says why. Stays pending if the
+   * instance is destroyed first.
    */
   readonly ready: Promise<void>;
   /**
    * Removes the app and releases its audio context, worker, listeners, timers and
-   * animation frames. Calling it again does nothing.
+   * animation frames, and ends every subscription to its state. Calling it again does
+   * nothing.
    */
   destroy(): void;
 }
 
-/** Where an app's files are, relative to the assets, and its default accessible name. */
-export interface AppFiles {
+/**
+ * A mounted app's commands and state, so a host's own controls, such as its window's
+ * menus, toolbar and status bar, can drive and show the app. `subscribe` and `run` don't
+ * use `this`, so they can be passed on as they are.
+ */
+export interface DnbmControls<Command extends string, State> {
+  /**
+   * The app's state now: a frozen snapshot, replaced by a new one when anything in it
+   * changes and otherwise the same object, so it suits React's `useSyncExternalStore`.
+   * Before `ready` and after `destroy()` (and if the app can't start) nothing in it plays
+   * and no command is available.
+   */
+  readonly state: State;
+  /**
+   * Calls `listener` with the new state after it changes, in a microtask, until the
+   * returned function unsubscribes it or the instance is destroyed; it is not called with
+   * the current state, which `state` holds. A listener added before `ready` hears the
+   * state the app shows at `ready`. Subscribing to a destroyed instance does nothing.
+   */
+  subscribe(listener: (state: State) => void): () => void;
+  /**
+   * Carries out a command, as its button or shortcut in the app would, and returns true;
+   * or does nothing and returns false, when `state.available` says it is unavailable:
+   * before `ready`, after `destroy()`, or while the app can't take it. A command that
+   * opens a file picker needs a user activation, so run it from the host's own click or
+   * key handler, not after an `await`.
+   */
+  run(command: Command): boolean;
+}
+
+/** The sequencer, as `mountDnbm` mounts it. */
+export interface DnbmSequencerInstance
+  extends DnbmInstance,
+    DnbmControls<DnbmSequencerCommand, DnbmSequencerState> {}
+
+/** The player, as `mountDnbmPlayer` mounts it. */
+export interface DnbmPlayerInstance
+  extends DnbmInstance,
+    DnbmControls<DnbmPlayerCommand, DnbmPlayerState> {}
+
+/**
+ * Where an app's files are, relative to the assets, its default accessible name, and the
+ * commands it takes, with its state before it is ready.
+ */
+export interface AppFiles<Command extends string = string, State extends object = object> {
   readonly module: string;
   readonly stylesheet: string;
   readonly label: string;
+  readonly commands: readonly Command[];
+  readonly idle: State;
 }
 
-export const SEQUENCER: AppFiles = {
+export const SEQUENCER: AppFiles<DnbmSequencerCommand, DnbmSequencerState> = {
   module: "mount.js",
   stylesheet: "styles.css",
   label: "dnbm drum and bass sequencer",
+  commands: SEQUENCER_COMMANDS,
+  idle: SEQUENCER_IDLE,
 };
 
-export const PLAYER: AppFiles = {
+export const PLAYER: AppFiles<DnbmPlayerCommand, DnbmPlayerState> = {
   module: "player/mount.js",
   stylesheet: "player/styles.css",
   label: "dnbm player",
+  commands: PLAYER_COMMANDS,
+  idle: PLAYER_IDLE,
 };
 
-export interface ShellOptions extends AppFiles, Pick<AppContext, "embed" | "songs" | "onTitle"> {
+export interface ShellOptions<Command extends string, State extends object>
+  extends AppFiles<Command, State>,
+    Pick<AppContext, "embed" | "actions" | "songs" | "onTitle"> {
   /** The assets' directory; relative URLs resolve against the container's document. */
   readonly assetsUrl: string | URL;
 }
@@ -134,11 +225,22 @@ function showFailure(root: ShadowRoot, error: unknown): void {
   root.replaceChildren(...[...root.querySelectorAll("link")].filter((link) => link.sheet), message);
 }
 
+function isControl(value: unknown): value is AppControl {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Partial<AppControl>).run === "function"
+  );
+}
+
 /**
  * Mounts an app in a new element appended to `container`, and returns at once: the
  * element is in place, and `ready` settles once the app shows.
  */
-export function mountApp(container: HTMLElement, options: ShellOptions): DnbmInstance {
+export function mountApp<Command extends string, State extends object>(
+  container: HTMLElement,
+  options: ShellOptions<Command, State>,
+): DnbmInstance & DnbmControls<Command, State> {
   const document = container.ownerDocument;
   const assets = assetsBase(document, options.assetsUrl);
   const element = document.createElement("div");
@@ -154,21 +256,28 @@ export function mountApp(container: HTMLElement, options: ShellOptions): DnbmIns
 
   const controller = new AbortController();
   let destroyed = false;
+  // The app's control, from `ready` until `destroy()`.
+  let control: AppControl | undefined;
+  const channel = new StateChannel(options.idle);
   const context: AppContext = {
     assets,
     signal: controller.signal,
     embed: options.embed,
+    actions: options.actions ?? true,
     songs: options.songs,
     onTitle: options.onTitle,
+    onState: (state) => channel.publish(state as State),
   };
   const ready = new Promise<void>((resolve, reject) => {
     Promise.all([importApp(new URL(options.module, assets).href), loaded(stylesheet)])
-      .then(async ([app]) => {
-        if (!destroyed) await app.mount(root, context);
-      })
+      .then(async ([app]) => (destroyed ? undefined : await app.mount(root, context)))
       .then(
-        () => {
-          if (!destroyed) resolve();
+        (mounted) => {
+          if (destroyed) return;
+          // An app module from an older package takes no commands, and its state stays idle.
+          control = isControl(mounted) ? mounted : undefined;
+          if (control) channel.open();
+          resolve();
         },
         (error: unknown) => {
           if (destroyed) return;
@@ -186,9 +295,20 @@ export function mountApp(container: HTMLElement, options: ShellOptions): DnbmIns
   return {
     element,
     ready,
+    get state() {
+      return channel.state;
+    },
+    subscribe: (listener) => channel.subscribe(listener),
+    run: (command) =>
+      !destroyed && control !== undefined && isCommand(options.commands, command)
+        ? control.run(command)
+        : false,
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      control = undefined;
+      // Before the app lets go, so nothing it does on the way out reaches a subscriber.
+      channel.close();
       controller.abort(new DOMException("The dnbm instance was destroyed.", "AbortError"));
       element.remove();
     },

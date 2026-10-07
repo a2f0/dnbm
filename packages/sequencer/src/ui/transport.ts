@@ -119,11 +119,13 @@ export class Transport {
     });
     void this.loadExamples(app);
 
+    // The buttons for the app's commands, which a host that shows them itself leaves out.
+    const actions = app.environment.actions;
     this.element = h("header", { class: "topbar" }, [
       h("div", { class: "brand", text: "dnbm" }),
       this.title,
       h("div", { class: "transport" }, [
-        this.playButton,
+        ...(actions ? [this.playButton] : []),
         h("div", { class: "segmented", role: "group", "aria-label": "Play mode" }, [
           this.modes.song,
           this.modes.loop,
@@ -133,19 +135,25 @@ export class Transport {
         this.readout,
       ]),
       scope.element,
-      h("nav", { class: "files", "aria-label": "Song" }, [
-        button("new", "New song", () => void app.newSong()),
-        button("open", "Open a song file (⌘O)", () => void app.open()),
-        button(
-          "save",
-          "Save (⌘S); ⇧ to save as",
-          (event?: unknown) => void app.save(event instanceof MouseEvent && event.shiftKey),
-        ),
-        button("export", "Render the song to a WAV file", () => void app.exportWav()),
-        this.examples,
-        this.undoButton,
-        this.redoButton,
-      ]),
+      h(
+        "nav",
+        { class: "files", "aria-label": "Song" },
+        actions
+          ? [
+              button("new", "New song", () => void app.newSong()),
+              button("open", "Open a song file (⌘O)", () => void app.open()),
+              button(
+                "save",
+                "Save (⌘S); ⇧ to save as",
+                (event?: unknown) => void app.save(event instanceof MouseEvent && event.shiftKey),
+              ),
+              button("export", "Render the song to a WAV file", () => void app.exportWav()),
+              this.examples,
+              this.undoButton,
+              this.redoButton,
+            ]
+          : [this.examples],
+      ),
     ]);
   }
 

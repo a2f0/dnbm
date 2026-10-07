@@ -29,13 +29,19 @@ export class Dialogs {
 
   /**
    * Dialogs open in `root`, over `content`, which goes inert while one is open. They
-   * cancel when `signal` aborts.
+   * cancel when `signal` aborts. `onChange` hears of each dialog opening and closing.
    */
   constructor(
     private readonly root: Document | ShadowRoot,
     private readonly content: HTMLElement,
     private readonly signal: AbortSignal,
+    private readonly onChange: () => void = () => {},
   ) {}
+
+  /** A dialog is open, and the app behind it inert. */
+  get isOpen(): boolean {
+    return this.open > 0;
+  }
 
   /**
    * Shows a dialog and resolves with how it closed: accepted, or cancelled. The message
@@ -83,6 +89,7 @@ export class Dialogs {
         if (opener instanceof HTMLElement && this.content.contains(opener)) {
           opener.focus({ preventScroll: true });
         }
+        this.onChange();
         resolve(dialog.returnValue === ACCEPT);
       });
       this.open += 1;
@@ -90,6 +97,7 @@ export class Dialogs {
       this.root.append(layer);
       dialog.show();
       (focus ?? acceptButton).focus();
+      this.onChange();
     });
   }
 

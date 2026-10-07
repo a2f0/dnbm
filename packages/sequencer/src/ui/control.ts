@@ -147,8 +147,9 @@ export class ParamControl {
     let startUnit = 0;
     this.element.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
-      event.preventDefault();
-      this.element.focus();
+      // The press goes on as any other does, so the host sees its mousedown (a host's
+      // open menu closes); the control's styles keep a drag from selecting or scrolling.
+      this.element.focus({ preventScroll: true });
       this.element.setPointerCapture(event.pointerId);
       this.dragging = true;
       startY = event.clientY;

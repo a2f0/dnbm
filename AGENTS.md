@@ -14,8 +14,8 @@ no framework:
 
 The workspace packages are private; the root `package.json` is the published
 `@a2f0/dnbm`, whose two entrypoints are in `src/` with the shell (`src/shell.ts`) that
-mounts an app into a shadow root in a host's document, and the build bundles the synth
-into each app. `README.md` gives the
+mounts an app into a shadow root in a host's document and the commands and state each
+app offers its host (`src/control.ts`), and the build bundles the synth into each app. `README.md` gives the
 overview and `docs/` the detail: [song format](docs/song-format.md),
 [architecture](docs/architecture.md), [package](docs/package.md),
 [deploying](docs/deploying.md).
@@ -69,7 +69,15 @@ song with the same engine, for checking sound changes offline.
   release audio, workers, timers, animation frames and any window listener when its
   signal aborts. Don't use `window.confirm`, `prompt` or `alert`, which block the host
   page: use `packages/sequencer/src/ui/dialog.ts`. Anything a browser may refuse, such
-  as a file picker, needs a fallback.
+  as a file picker, needs a fallback. Don't cancel a press's `pointerdown`, which keeps
+  the browser from dispatching its `mousedown` at all: the host's own listeners must
+  hear every press, as its menus close on them. Keep drags from selecting text or
+  scrolling with `user-select` and `touch-action` instead.
+- A host drives an app through its instance's `run`, `state` and `subscribe`
+  (`src/control.ts`), never its DOM. A command does exactly what its button or
+  shortcut does, through the same code; an app publishes its state through
+  `onState` whenever it may have changed, and a command it can't take now is
+  unavailable in that state. Adding a command or a state field is public API.
 - The sound is dark: minor keys, low filter cutoffs and dark reverb by default. Keep new
   defaults and example songs in that spirit.
 - Songs are canonical (`bun run songs:fmt`). Never hand-format a `.dnbm.json` file, and
@@ -119,8 +127,8 @@ Each merge that raises the version publishes `@a2f0/dnbm` to npm through
 `.github/workflows/npm-publish.yml`; verify that run and the npm version after merging,
 and report a failed publish separately from the merge. The package's public API is
 `mountDnbm`, `mountDnbmPlayer` and `copyDnbmAssets`, with the instances they return and
-the asset layout `copyDnbmAssets` copies; keep it backward compatible or bump the minor
-version.
+the asset layout `copyDnbmAssets` copies, and the commands and state the instances
+offer; keep it backward compatible or bump the minor version.
 
 Merging deploys only once the `DNBM_DEPLOY` repository variable is set; until then,
 `bun run deploy` publishes by hand (see `docs/deploying.md`).
