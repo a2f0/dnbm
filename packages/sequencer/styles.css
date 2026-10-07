@@ -3,10 +3,13 @@
    brighter is louder, selected, or playing.
 
    These styles apply inside the app's shadow root (src/shell.ts), and only there. The
-   shell gives the host element `all: initial`, so nothing the host page sets reaches
-   the app; the root's top-level elements (.frame, .dialog-layer, .failure) set the
-   app's type and colours. */
-:host {
+   shell gives the host element `all: initial`, so no property the host page sets
+   reaches the app. Custom properties outlast `all`, so the palette is defined on the
+   root's top-level elements (.frame, .dialog-layer, .failure), below the host
+   element, where they also set the app's type and colours. */
+.frame,
+.dialog-layer,
+.failure {
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --bg: #0a0a0a;
   --panel: #0f0f0f;

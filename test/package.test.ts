@@ -321,6 +321,7 @@ interface HostWindow {
   mountSequencer(): Promise<void>;
   mountPlayer(): Promise<void>;
   contexts: AudioContext[];
+  workers: { terminated: boolean }[];
   frames: number;
   /** The shadow root of the app in the container with this id. */
   shadow(id: string): ShadowRoot;
@@ -333,7 +334,7 @@ interface HostWindow {
 const HOST_PAGE = `<!doctype html><meta charset="utf-8"><title>host</title>
 <style>
   body { margin: 0; font: italic 30px serif; letter-spacing: 4px; color: #777777; }
-  * { line-height: 3; text-transform: uppercase; }
+  * { line-height: 3; text-transform: uppercase; --bg: #ffffff; --faint: #000000; --fill: 50%; }
   div { font: italic 30px serif; color: #777777; background: #ffffff; word-spacing: 9px; }
   button { background: #ffffff; font-size: 30px; }
   .cell, .track { display: none; }
@@ -369,6 +370,7 @@ const HOST_PAGE = `<!doctype html><meta charset="utf-8"><title>host</title>
 function instrument(): void {
   const host = window as unknown as HostWindow;
   host.contexts = [];
+  host.workers = [];
   host.frames = 0;
   host.shadow = (id) => {
     const root = document.querySelector(`#${id} > div`)?.shadowRoot;
@@ -380,6 +382,18 @@ function instrument(): void {
     constructor(options?: AudioContextOptions) {
       super(options);
       host.contexts.push(this);
+    }
+  };
+  const NativeWorker = Worker;
+  window.Worker = class extends NativeWorker {
+    private readonly record = { terminated: false };
+    constructor(url: string | URL, options?: WorkerOptions) {
+      super(url, options);
+      host.workers.push(this.record);
+    }
+    override terminate(): void {
+      this.record.terminated = true;
+      super.terminate();
     }
   };
   const nativeFrame = window.requestAnimationFrame.bind(window);
@@ -875,6 +889,66 @@ describe("the packaged app mounted in a host page", () => {
         title?: string;
       },
     ).toMatchObject({ title: "Saved Before" });
+  }, 20_000);
+
+  test("destroying the app while its audio starts closes the audio context", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    const requested = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    await page.route("**/engine.wasm", async (route) => {
+      requested.resolve();
+      await released.promise;
+      await route.continue();
+    });
+    try {
+      const before = await page.evaluate(() => (window as unknown as HostWindow).contexts.length);
+      await sequencer.locator(".play").click();
+      await requested.promise;
+      expect(await page.evaluate(() => (window as unknown as HostWindow).contexts.length)).toBe(
+        before + 1,
+      );
+      await page.evaluate(() => (window as unknown as HostWindow).sequencerApp?.destroy());
+    } finally {
+      released.resolve();
+    }
+    await page.waitForFunction(() =>
+      (window as unknown as HostWindow).contexts.every((context) => context.state === "closed"),
+    );
+    // Once the engine's module arrives, nothing restarts or reopens audio.
+    await page.waitForTimeout(500);
+    expect(
+      await page.evaluate(() =>
+        (window as unknown as HostWindow).contexts.every((context) => context.state === "closed"),
+      ),
+    ).toBe(true);
+    await page.unroute("**/engine.wasm");
+  }, 20_000);
+
+  test("destroying the app during a WAV export stops its worker and downloads nothing", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    const downloads: string[] = [];
+    const record = (download: { suggestedFilename(): string }) =>
+      downloads.push(download.suggestedFilename());
+    page.on("download", record);
+    try {
+      const before = await page.evaluate(() => (window as unknown as HostWindow).workers.length);
+      await sequencer.locator('.files button:text-is("export")').click();
+      await page.waitForFunction(
+        (count) => (window as unknown as HostWindow).workers.length > count,
+        before,
+      );
+      await page.evaluate(() => (window as unknown as HostWindow).sequencerApp?.destroy());
+      expect(
+        await page.evaluate(() =>
+          (window as unknown as HostWindow).workers.every((worker) => worker.terminated),
+        ),
+      ).toBe(true);
+      // The export would have finished in this time.
+      await page.waitForTimeout(3_000);
+      expect(downloads).toEqual([]);
+    } finally {
+      page.off("download", record);
+    }
   }, 20_000);
 
   test("destroy releases the audio context, animation frames, listeners and element", async () => {

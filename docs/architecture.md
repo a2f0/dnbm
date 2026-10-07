@@ -29,7 +29,8 @@ apps can share a page.
 
 The shell gives the element `all: initial` inline, which outranks the host page's
 rules for it, so nothing the host sets is inherited into the app; the app's top-level
-elements set its type and colours, and no rule of the app's reaches the host. Work
+elements define its palette (custom properties outlast `all`) and set its type and
+colours, and no rule of the app's reaches the host. Work
 that outlives the app, such as a file picker still open when it is destroyed, writes
 nothing to storage once its signal has aborted.
 

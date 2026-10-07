@@ -3,10 +3,12 @@
    dark display, after the desktop players of old.
 
    These styles apply inside the player's shadow root (src/shell.ts), and only there.
-   The shell gives the host element `all: initial`, so nothing the host page sets
-   reaches the player; the root's top-level elements (.frame, .failure) set its type
-   and colours. */
-:host {
+   The shell gives the host element `all: initial`, so no property the host page sets
+   reaches the player. Custom properties outlast `all`, so the palette is defined on
+   the root's top-level elements (.frame, .failure), below the host element, where they
+   also set its type and colours. */
+.frame,
+.failure {
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --bg: #0a0a0a;
   --skin: #1b1b1b;
