@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   type DnbmSequencerState,
   isCommand,
+  PLAYER_IDLE,
   SEQUENCER_COMMANDS,
   SEQUENCER_IDLE,
   StateChannel,
@@ -134,6 +135,14 @@ describe("an instance's state", () => {
     await settle();
     expect(late).toEqual([]);
     expect(closing.state).toBe(SEQUENCER_IDLE);
+  });
+
+  test("shares a frozen idle state between instances", () => {
+    for (const idle of [SEQUENCER_IDLE, PLAYER_IDLE]) {
+      expect(Object.isFrozen(idle)).toBe(true);
+      expect(Object.isFrozen(idle.available)).toBe(true);
+      expect(Object.values(idle.available)).not.toContain(true);
+    }
   });
 
   test("takes only its own commands, never an inherited key", () => {

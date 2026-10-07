@@ -1468,6 +1468,7 @@ describe("the packaged app driven by its host's controls", () => {
       const ready = host.mountSequencer();
       const app = host.sequencerApp as DnbmSequencerInstance;
       const idle = app.state;
+      const frozen = [Object.isFrozen(idle), Object.isFrozen(idle.available)];
       const early = [app.run("togglePlay"), app.run("new")];
       const heard: string[] = [];
       app.subscribe((state) => heard.push(`${state.title} ${state.playing}`));
@@ -1482,12 +1483,14 @@ describe("the packaged app driven by its host's controls", () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
       return {
         idle,
+        frozen,
         early,
         atReady,
         heardAtReady,
         ran,
         heard,
         after: app.state,
+        frozenAfter: [Object.isFrozen(app.state), Object.isFrozen(app.state.available)],
         late: [app.run("play"), app.run("stop"), app.run("toString" as never)],
         resumedClosed: host.resumedClosed - resumed,
         unsubscribe: typeof app.subscribe(() => heard.push("late")),
@@ -1508,6 +1511,9 @@ describe("the packaged app driven by its host's controls", () => {
     const idle = { playing: false, title: "", fileName: "", dirty: false, available: none };
     expect(result.idle).toEqual(idle);
     expect(result.early).toEqual([false, false]);
+    // A host can't change the idle state every instance shares.
+    expect(result.frozen).toEqual([true, true]);
+    expect(result.frozenAfter).toEqual([true, true]);
     expect(result.atReady).toMatchObject({
       playing: false,
       title: "Undertow",

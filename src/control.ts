@@ -106,24 +106,27 @@ export const PLAYER_COMMANDS: readonly DnbmPlayerCommand[] = [
   "toggleRepeat",
 ];
 
-/** The sequencer's state before it is ready and once it is destroyed. */
-export const SEQUENCER_IDLE: DnbmSequencerState = {
+/**
+ * The sequencer's state before it is ready and once it is destroyed: frozen, as every
+ * instance shares it.
+ */
+export const SEQUENCER_IDLE: DnbmSequencerState = freeze({
   playing: false,
   title: "",
   fileName: "",
   dirty: false,
   available: unavailable(SEQUENCER_COMMANDS),
-};
+});
 
-/** The player's state before it is ready and once it is destroyed. */
-export const PLAYER_IDLE: DnbmPlayerState = {
+/** The player's state before it is ready and once it is destroyed, frozen likewise. */
+export const PLAYER_IDLE: DnbmPlayerState = freeze({
   playing: false,
   paused: false,
   title: "",
   shuffle: false,
   repeat: false,
   available: unavailable(PLAYER_COMMANDS),
-};
+});
 
 /** What `run` and `available` accept: a known command, never an inherited key. */
 export function isCommand<Command extends string>(

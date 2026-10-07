@@ -69,10 +69,10 @@ song with the same engine, for checking sound changes offline.
   release audio, workers, timers, animation frames and any window listener when its
   signal aborts. Don't use `window.confirm`, `prompt` or `alert`, which block the host
   page: use `packages/sequencer/src/ui/dialog.ts`. Anything a browser may refuse, such
-  as a file picker, needs a fallback. Don't cancel a press's `pointerdown` or
-  `mousedown`: the host's own listeners must hear every press, as its menus close on
-  them; keep drags from selecting text or scrolling with `user-select` and
-  `touch-action` instead.
+  as a file picker, needs a fallback. Don't cancel a press's `pointerdown`, which keeps
+  the browser from dispatching its `mousedown` at all: the host's own listeners must
+  hear every press, as its menus close on them. Keep drags from selecting text or
+  scrolling with `user-select` and `touch-action` instead.
 - A host drives an app through its instance's `run`, `state` and `subscribe`
   (`src/control.ts`), never its DOM. A command does exactly what its button or
   shortcut does, through the same code; an app publishes its state through
