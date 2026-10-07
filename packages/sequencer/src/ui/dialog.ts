@@ -48,7 +48,8 @@ export class Dialogs {
       const acceptButton = h("button", { type: "button", class: "dialog-accept", text: accept });
       const dialog = h(
         "dialog",
-        { class: "dialog", "aria-labelledby": message.id, "aria-modal": "true" },
+        // Not aria-modal: only the app behind it goes inert, and the host page stays usable.
+        { class: "dialog", "aria-labelledby": message.id },
         [message, h("div", { class: "dialog-actions" }, [cancelButton, acceptButton])],
       );
       // The layer covers the app; a press on it keeps focus in the dialog.
