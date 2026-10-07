@@ -333,6 +333,8 @@ interface HostWindow {
 const HOST_PAGE = `<!doctype html><meta charset="utf-8"><title>host</title>
 <style>
   body { margin: 0; font: italic 30px serif; letter-spacing: 4px; color: #777777; }
+  * { line-height: 3; text-transform: uppercase; }
+  div { font: italic 30px serif; color: #777777; background: #ffffff; word-spacing: 9px; }
   button { background: #ffffff; font-size: 30px; }
   .cell, .track { display: none; }
   #window, #player { float: left; }
@@ -474,15 +476,27 @@ describe("the packaged app mounted in a host page", () => {
       const hostPlay = document.getElementById("host-play");
       if (!help || !cell || !hostPlay) throw new Error("missing elements");
       const helpStyle = getComputedStyle(help);
+      const frame = root?.querySelector(".frame");
       return {
-        helpFont: [helpStyle.fontSize, helpStyle.fontStyle, helpStyle.letterSpacing],
+        helpFont: [
+          helpStyle.fontSize,
+          helpStyle.fontStyle,
+          helpStyle.letterSpacing,
+          helpStyle.wordSpacing,
+          helpStyle.textTransform,
+          helpStyle.color,
+        ],
         monospace: helpStyle.fontFamily.includes("monospace"),
+        background: frame && getComputedStyle(frame).backgroundColor,
         cell: getComputedStyle(cell).display,
         hostPlay: [getComputedStyle(hostPlay).backgroundColor, getComputedStyle(hostPlay).width],
       };
     });
-    expect(styles.helpFont).toEqual(["11px", "normal", "normal"]);
+    // The host's rules for every element and every div, which match the app's own
+    // element, reach nothing inside it.
+    expect(styles.helpFont).toEqual(["11px", "normal", "normal", "0px", "none", "rgb(84, 84, 84)"]);
     expect(styles.monospace).toBe(true);
+    expect(styles.background).toBe("rgb(10, 10, 10)");
     expect(styles.cell).toBe("block");
     // The app's .play rules (a 36px square) never reach the host's own .play button.
     expect(styles.hostPlay[0]).toBe("rgb(255, 255, 255)");
@@ -796,6 +810,26 @@ describe("the packaged app mounted in a host page", () => {
     );
   }, 20_000);
 
+  test("opens a song file dropped on the app", async () => {
+    const text = await readFile(join(installed, "site", "songs", "wraith.dnbm.json"), "utf8");
+    const dataTransfer = await page.evaluateHandle((song) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([song], "wraith.dnbm.json", { type: "application/json" }));
+      return transfer;
+    }, text);
+    const grid = sequencer.locator(".grid-scroll");
+    await grid.dispatchEvent("dragover", { dataTransfer });
+    await grid.dispatchEvent("drop", { dataTransfer });
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("window").querySelector<HTMLInputElement>(".title")
+          ?.value === "Wraith",
+    );
+    expect(await sequencer.locator(".status-message").textContent()).toBe(
+      "Opened wraith.dnbm.json.",
+    );
+  }, 20_000);
+
   test("keeps an edit made just before the host destroys and remounts the app", async () => {
     await sequencer.locator(".title").fill("Night Bus");
     // Commit the edit, then destroy and remount at once: milliseconds, not the
@@ -821,6 +855,26 @@ describe("the packaged app mounted in a host page", () => {
     await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
     expect(await sequencer.locator(".title").inputValue()).toBe("Saved Before");
     expect(await sequencer.locator(".status-file").textContent()).not.toContain("●");
+  }, 20_000);
+
+  test("a file picked after the host destroys the app opens nothing", async () => {
+    // The song is clean, so open asks for a file at once; the host then remounts.
+    const chooser = page.waitForEvent("filechooser");
+    await sequencer.locator('.files button:text-is("open")').click();
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    const song = await readFile(join(installed, "site", "songs", "undertow.dnbm.json"));
+    await (await chooser).setFiles({
+      name: "undertow.dnbm.json",
+      mimeType: "application/json",
+      buffer: song,
+    });
+    await page.waitForTimeout(500);
+    expect(await sequencer.locator(".title").inputValue()).toBe("Saved Before");
+    expect(
+      JSON.parse(await page.evaluate(() => localStorage.getItem("dnbm:song") ?? "{}")) as {
+        title?: string;
+      },
+    ).toMatchObject({ title: "Saved Before" });
   }, 20_000);
 
   test("destroy releases the audio context, animation frames, listeners and element", async () => {

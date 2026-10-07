@@ -27,8 +27,11 @@ releases its worker, timers, animation frames and window listener; the shell rem
 the element. The module has no state of its own beyond its code, so any number of
 apps can share a page.
 
-The stylesheets style `:host` from initial values, so nothing the host page's elements
-inherit reaches the app, and no rule of the app's reaches the host.
+The shell gives the element `all: initial` inline, which outranks the host page's
+rules for it, so nothing the host sets is inherited into the app; the app's top-level
+elements set its type and colours, and no rule of the app's reaches the host. Work
+that outlives the app, such as a file picker still open when it is destroyed, writes
+nothing to storage once its signal has aborted.
 
 | Package | Holds |
 | --- | --- |

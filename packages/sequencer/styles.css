@@ -3,21 +3,10 @@
    brighter is louder, selected, or playing.
 
    These styles apply inside the app's shadow root (src/shell.ts), and only there. The
-   host element starts from initial values, so nothing the host page's elements
-   inherit reaches the app. */
+   shell gives the host element `all: initial`, so nothing the host page sets reaches
+   the app; the root's top-level elements (.frame, .dialog-layer, .failure) set the
+   app's type and colours. */
 :host {
-  all: initial;
-  display: block;
-  position: relative;
-  isolation: isolate;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
-  font: 12px / 1.4 var(--mono);
-  -webkit-font-smoothing: antialiased;
-  color-scheme: dark;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --bg: #0a0a0a;
   --panel: #0f0f0f;
@@ -47,12 +36,22 @@
   box-sizing: border-box;
 }
 
+.frame,
+.dialog-layer,
+.failure {
+  color-scheme: dark;
+  color: var(--text);
+  font: 12px / 1.4 var(--mono);
+  -webkit-font-smoothing: antialiased;
+}
+
 /* The app's viewport: it scrolls a layout taller than the host's container, and its
    size answers the layout's container queries, as a frame's window once did. */
 .frame {
   container: dnbm / size;
   height: 100%;
   overflow: auto;
+  background: var(--bg);
   scrollbar-color: var(--line-strong) transparent;
 }
 
@@ -70,8 +69,10 @@
 }
 
 .failure {
+  height: 100%;
   margin: 0;
   padding: 24px;
+  background: var(--bg);
   color: var(--muted);
 }
 

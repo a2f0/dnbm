@@ -59,7 +59,8 @@ dnbm.destroy();
   loads.
 - `destroy()` removes the element and releases everything the app holds: its audio
   context, worker, listeners, timers and animation frames. Calling it again does
-  nothing, and destroying while the app still loads is safe.
+  nothing, and destroying while the app still loads is safe. Unlike a frame, the app
+  doesn't stop when its element merely leaves the page: always call `destroy`.
 
 Embedding hides the dnbm wordmark, since the host names the app; pass
 `branding: true` to show it. Importing the module never touches the DOM, so server

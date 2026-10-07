@@ -255,11 +255,19 @@ export class App {
     });
   }
 
+  /** True once the app is gone: work that outlived it must not touch storage. */
+  private get gone(): boolean {
+    return this.environment.signal.aborted;
+  }
+
   /**
    * Saves the song to local storage on every change, never later: an embedding host
-   * can destroy the app at any moment, and a delayed write would be lost.
+   * can destroy the app at any moment, and a delayed write would be lost. Once the app
+   * is gone it writes nothing, so a file picker or a drop that outlives it can't
+   * overwrite what the app mounted in its place saves.
    */
   private autosave(): void {
+    if (this.gone) return;
     writeStorage(AUTOSAVE_KEY, serializeSong(this.song));
     writeStorage(SAVED_KEY, this.store.saved);
   }
@@ -416,6 +424,7 @@ export class App {
 
   /** Loads song text, as from a file; reports errors instead of throwing. */
   openText(text: string, name: string, handle?: FileSystemFileHandle): void {
+    if (this.gone) return;
     try {
       this.load(parseSongText(text), name, handle, text);
       this.say(`Opened ${name}.`);
@@ -456,7 +465,7 @@ export class App {
     const name = this.fileName ?? songFileName(this.song.title);
     try {
       const handle = await saveSongFile(text, name, saveAs ? undefined : this.fileHandle);
-      if (handle === null) return;
+      if (handle === null || this.gone) return;
       this.fileHandle = handle;
       this.fileName = handle?.name ?? name;
       this.store.markSaved(text);
@@ -464,6 +473,7 @@ export class App {
       this.render();
       this.say(handle ? `Saved ${this.fileName}.` : `Downloaded ${name}.`);
     } catch (error) {
+      if (this.gone) return;
       this.say(`Couldn't save: ${error instanceof Error ? error.message : error}`, true);
     }
   }
@@ -530,7 +540,7 @@ export class App {
    * never do.
    */
   private listen(): void {
-    const { frame } = this.environment;
+    const { frame, root } = this.environment;
     frame.addEventListener("pointerdown", () => {
       this.keyboardNavigation = false;
     });
@@ -541,12 +551,14 @@ export class App {
       event.preventDefault();
       action();
     });
-    // Drop a song file anywhere on the app to open it.
-    frame.addEventListener("dragover", (event) => event.preventDefault());
-    frame.addEventListener("drop", async (event) => {
+    // Drop a song file anywhere on the app to open it. A drop on an open dialog does
+    // nothing, rather than letting the browser open the file in place of the page.
+    root.addEventListener("dragover", (event) => event.preventDefault());
+    root.addEventListener("drop", async (event) => {
       event.preventDefault();
-      const file = event.dataTransfer?.files[0];
-      if (file && (await this.confirmDiscard())) this.openText(await file.text(), file.name);
+      const file = (event as DragEvent).dataTransfer?.files[0];
+      if (!file || root.querySelector("dialog[open]")) return;
+      if (await this.confirmDiscard()) this.openText(await file.text(), file.name);
     });
   }
 }
