@@ -321,6 +321,8 @@ interface HostWindow {
   mountSequencer(): Promise<void>;
   mountPlayer(): Promise<void>;
   contexts: AudioContext[];
+  /** Calls to resume an audio context that was already closed. */
+  resumedClosed: number;
   workers: { terminated: boolean }[];
   frames: number;
   /** The shadow root of the app in the container with this id. */
@@ -370,6 +372,7 @@ const HOST_PAGE = `<!doctype html><meta charset="utf-8"><title>host</title>
 function instrument(): void {
   const host = window as unknown as HostWindow;
   host.contexts = [];
+  host.resumedClosed = 0;
   host.workers = [];
   host.frames = 0;
   host.shadow = (id) => {
@@ -382,6 +385,10 @@ function instrument(): void {
     constructor(options?: AudioContextOptions) {
       super(options);
       host.contexts.push(this);
+    }
+    override resume(): Promise<void> {
+      if (this.state === "closed") host.resumedClosed += 1;
+      return super.resume();
     }
   };
   const NativeWorker = Worker;
@@ -938,6 +945,33 @@ describe("the packaged app mounted in a host page", () => {
       );
     }
   }, 20_000);
+
+  test("a play or preview pressed as the host destroys the apps touches no closed audio", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    await page.evaluate(() => (window as unknown as HostWindow).mountPlayer());
+    // Start both engines, then stop.
+    await sequencer.locator(".play").click();
+    await sequencer.locator(".cell.now").first().waitFor({ timeout: 10_000 });
+    await sequencer.locator(".play").click();
+    await player.locator(".control.play").click();
+    await player.locator('.player[data-state="playing"]').waitFor();
+    await player.locator(".control.stop").click();
+    const late = await page.evaluate(async () => {
+      const host = window as unknown as HostWindow;
+      const before = host.resumedClosed;
+      // Each press awaits the started engine, and the host destroys the apps before
+      // that await resumes.
+      host.shadow("window").querySelector<HTMLButtonElement>(".play")?.click();
+      host.shadow("window").querySelector<HTMLButtonElement>(".track-name")?.click();
+      host.shadow("player").querySelector<HTMLButtonElement>(".control.play")?.click();
+      host.sequencerApp?.destroy();
+      host.playerApp?.destroy();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return host.resumedClosed - before;
+    });
+    expect(late).toBe(0);
+    expect(errors).toEqual([]);
+  }, 30_000);
 
   test("destroying the app while its audio starts closes the audio context", async () => {
     await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());

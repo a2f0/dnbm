@@ -152,6 +152,7 @@ export class App {
 
   /** Runs `callback` after `delay` milliseconds, unless the app goes first. */
   later(callback: () => void, delay: number): void {
+    if (this.gone) return;
     const timer = setTimeout(() => {
       this.timers.delete(timer);
       callback();
@@ -322,7 +323,8 @@ export class App {
     const request = ++this.playbackRequest;
     this.setView({ playing: true });
     const host = await this.engine();
-    if (request !== this.playbackRequest) return;
+    // The app may have gone while the engine was awaited.
+    if (request !== this.playbackRequest || this.gone) return;
     if (!host) {
       this.setView({ playing: false });
       return;
@@ -378,7 +380,7 @@ export class App {
     const token = Symbol();
     this.auditions.set(trackIndex, token);
     const host = await this.engine();
-    if (!host || this.auditions.get(trackIndex) !== token) return;
+    if (!host || this.gone || this.auditions.get(trackIndex) !== token) return;
     const current = this.song.tracks[trackIndex];
     if (current?.id !== track.id || current.instrument !== track.instrument) return;
     host.trigger(trackIndex, spec.melodic ? 1 : 0.85, pitch);

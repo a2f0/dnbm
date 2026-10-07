@@ -90,7 +90,14 @@ export class Player {
     private readonly options: PlayerOptions,
   ) {
     this.spectrum = new Spectrum(options.signal);
-    options.signal.addEventListener("abort", () => this.clearTail(), { once: true });
+    options.signal.addEventListener(
+      "abort",
+      () => {
+        this.clearTail();
+        this.host = undefined;
+      },
+      { once: true },
+    );
     this.timelines = songs.map(timeline);
     this.playlist = new Playlist(songs.length);
 
@@ -291,6 +298,8 @@ export class Player {
     this.state = "playing";
     this.render();
     const host = await this.engine();
+    // The player may have gone while the engine was awaited.
+    if (this.options.signal.aborted) return;
     if (!host) {
       this.state = "stopped";
       this.render();
