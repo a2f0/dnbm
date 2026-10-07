@@ -62,7 +62,9 @@ song with the same engine, for checking sound changes offline.
   host's document, and the site's own pages mount them the same way), so an app stays
   inside its root: listen for keys, presses and drops on its frame, not the window or
   document; look up elements through its root (`getRootNode()`), not `document`;
-  resolve URLs from the assets URL, not the page; set no globals or page title; and
+  scroll only its own containers (`reveal` in `packages/sequencer/src/ui/dom.ts`), never
+  with `scrollIntoView`, which scrolls the host page too; resolve URLs from the assets
+  URL, not the page; set no globals or page title; and
   release audio, workers, timers, animation frames and any window listener when its
   signal aborts. Don't use `window.confirm`, `prompt` or `alert`, which block the host
   page: use `packages/sequencer/src/ui/dialog.ts`. Anything a browser may refuse, such

@@ -6,7 +6,7 @@ import { ID_PATTERN, MAX_PATTERNS, type Song } from "@a2f0/dnbm-synth/song/model
 import { DRUM_REST, emptyRow, MAX_BARS, REST, STEPS_PER_BAR } from "@a2f0/dnbm-synth/song/notation";
 import type { App } from "../app";
 import type { View } from "../view";
-import { h, setClass } from "./dom";
+import { h, reveal, setClass } from "./dom";
 
 export class PatternBar {
   readonly element: HTMLElement;
@@ -155,7 +155,7 @@ export class PatternBar {
         chip,
         `chip${now ? " now" : ""}${!view.playing && view.mode === "song" && slot === view.startSlot ? " start" : ""}`,
       );
-      if (now) chip.scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (now) reveal(chip, this.chips);
     });
   }
 

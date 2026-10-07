@@ -346,6 +346,7 @@ const HOST_PAGE = `<!doctype html><meta charset="utf-8"><title>host</title>
 <button class="play" id="host-play">host</button>
 <div id="window" style="width:1200px;height:800px"></div>
 <div id="player" style="width:440px;height:420px"></div>
+<div id="below" style="clear:both;height:3000px"></div>
 <script type="module">
   import * as dnbm from "/lib/index.js";
   window.dnbm = dnbm;
@@ -579,6 +580,27 @@ describe("the packaged app mounted in a host page", () => {
     await sequencer.locator(".cell.now").first().waitFor({ timeout: 10_000 });
     await sequencer.locator(".play").click();
   }, 20_000);
+
+  test("playing scrolls its own song row, never the host page", async () => {
+    await sequencer.locator(".play").click();
+    await sequencer.locator(".chip.now").waitFor();
+    const first = await sequencer.locator(".chip.now").getAttribute("data-slot");
+    // The host page scrolls the app's top, where the playing slot shows, out of view.
+    await page.evaluate(() => window.scrollTo(0, 600));
+    await page.waitForFunction(
+      (slot) =>
+        (window as unknown as HostWindow)
+          .shadow("window")
+          .querySelector(".chip.now")
+          ?.getAttribute("data-slot") !== slot,
+      first,
+      { timeout: 15_000 },
+    );
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => window.scrollY)).toBe(600);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await sequencer.locator(".play").click();
+  }, 30_000);
 
   test("a held preview releases outside the grid after switching patterns", async () => {
     const sub = sequencer.locator(".track-name").filter({ hasText: /^sub$/ });

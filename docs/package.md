@@ -70,7 +70,9 @@ Audio starts on the first press inside the app, as browsers require. The app tak
 the keyboard only while focus is inside it, and a press anywhere in it gives it focus:
 keys pressed elsewhere on the host page, or in another app, never reach its
 shortcuts. Presses and keys still bubble out of it to the host, so a host's window
-can raise itself on a press inside the app. Confirmations and prompts open inside the
+can raise itself on a press inside the app; a key the app acts on arrives with
+`defaultPrevented` set, so a host's own shortcuts can leave it alone. The app scrolls
+only its own panels, never the host page. Confirmations and prompts open inside the
 app, over the app only, and the rest of the host page stays usable.
 
 In a React component, an effect owns the lifecycle. Mounting is synchronous, so React
