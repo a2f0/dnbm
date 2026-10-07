@@ -1,5 +1,6 @@
 // Serves dist/ on localhost and rebuilds when sources change: the engine when
-// packages/synth/engine/ changes, the pages otherwise. Responses carry the production
+// packages/synth/engine/ changes, the pages otherwise (including the shell in src/,
+// which both pages' scripts bundle). Responses carry the production
 // headers from packages/sequencer/_headers, so the content security policy is exercised
 // locally too.
 // AudioWorklet needs a secure context: localhost is one, file:// pages are not.
@@ -68,6 +69,7 @@ watch(join(ROOT, "packages"), { recursive: true }, (_event, file) => {
   rebuild(file.startsWith(ENGINE));
 });
 watch(join(ROOT, "songs"), { recursive: true }, () => rebuild(false));
+watch(join(ROOT, "src"), { recursive: true }, () => rebuild(false));
 
 console.info(`dnbm: http://localhost:${server.port}`);
 console.info(`player: http://localhost:${server.port}/player/`);

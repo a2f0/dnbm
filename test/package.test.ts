@@ -7,8 +7,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { type Browser, chromium, type Frame, type Page } from "playwright-core";
+import { type Browser, chromium, type Locator, type Page } from "playwright-core";
 import { buildPackage } from "../scripts/buildPackage";
+import type { DnbmInstance } from "../src/index";
 
 const ROOT = join(import.meta.dir, "..");
 
@@ -65,6 +66,13 @@ afterAll(async () => {
   if (temporary) await rm(temporary, { recursive: true, force: true });
 });
 
+async function copyAssets(destination: string): Promise<void> {
+  const { copyDnbmAssets } = (await import(
+    pathToFileURL(join(installed, "lib", "build.js")).href
+  )) as { copyDnbmAssets: (destination: string) => Promise<void> };
+  await copyDnbmAssets(destination);
+}
+
 describe("the published package", () => {
   test("ships the app and declarations, and nothing from the repository besides docs", async () => {
     const files = packed.files.map((file) => file.path);
@@ -77,10 +85,14 @@ describe("the published package", () => {
     for (const file of [
       "lib/index.js",
       "lib/index.d.ts",
+      "lib/shell.js",
+      "lib/shell.d.ts",
       "lib/build.js",
       "lib/build.d.ts",
       "site/index.html",
+      "site/page.css",
       "site/main.js",
+      "site/mount.js",
       "site/styles.css",
       "site/worklet.js",
       "site/renderWorker.js",
@@ -90,6 +102,7 @@ describe("the published package", () => {
       "site/song.schema.json",
       "site/player/index.html",
       "site/player/main.js",
+      "site/player/mount.js",
       "site/player/styles.css",
       "docs/package.md",
     ]) {
@@ -124,8 +137,12 @@ describe("the published package", () => {
 import { copyDnbmAssets } from "@a2f0/dnbm/build";
 
 export function mount(container: HTMLElement): DnbmInstance {
-  const options: DnbmOptions = { assetsUrl: "/dnbm/", branding: false };
-  return mountDnbm(container, options);
+  const options: DnbmOptions = { assetsUrl: "/dnbm/", branding: false, title: "dnbm" };
+  const instance = mountDnbm(container, options);
+  const element: HTMLElement = instance.element;
+  const ready: Promise<void> = instance.ready;
+  void ready.then(() => element.shadowRoot?.querySelector(".cell"));
+  return instance;
 }
 export function mountPlayer(container: HTMLElement): DnbmInstance {
   const options: DnbmPlayerOptions = {
@@ -176,14 +193,26 @@ console.log(
     });
   }, 60_000);
 
+  test("leaves the app module's import to the browser when a host bundles it", async () => {
+    // The app's code is served with the assets; a host's bundler must not try to bundle
+    // it. webpack, Turbopack and Vite read these comments; Bun leaves the import alone.
+    const shell = await readFile(join(installed, "lib", "shell.js"), "utf8");
+    expect(shell).toContain(
+      "import(/* webpackIgnore: true */ /* @vite-ignore */ /* turbopackIgnore: true */ url)",
+    );
+    const bundled = await Bun.build({
+      entrypoints: [join(installed, "lib", "index.js")],
+      target: "browser",
+      format: "esm",
+    });
+    expect(bundled.success).toBe(true);
+    const [output] = bundled.outputs;
+    expect(await output?.text()).toContain("return import(url);");
+  });
+
   test("copies an app that serves from a nested path", async () => {
-    const { copyDnbmAssets } = (await import(
-      pathToFileURL(join(installed, "lib", "build.js")).href
-    )) as {
-      copyDnbmAssets: (destination: string) => Promise<void>;
-    };
     const publicDirectory = join(temporary, "public");
-    await copyDnbmAssets(join(publicDirectory, "apps", "dnbm"));
+    await copyAssets(join(publicDirectory, "apps", "dnbm"));
     const server = Bun.serve({
       port: 0,
       fetch: (request) => {
@@ -200,7 +229,10 @@ console.log(
       const referenced = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(
         (match) => match[1] ?? "",
       );
-      // What the page and its scripts load, relative to the page.
+      expect(referenced).toEqual(
+        expect.arrayContaining(["page.css", "mount.js", "styles.css", "main.js"]),
+      );
+      // What the page, its app module and the shell load, relative to the assets.
       for (const path of [...referenced, "worklet.js", "renderWorker.js", "songs/index.json"]) {
         expect([path, (await fetch(new URL(path, page))).status]).toEqual([path, 200]);
       }
@@ -226,140 +258,274 @@ console.log(
     }
   });
 
-  test("mounts the app in a frame, and refuses assets it can't serve", async () => {
-    const { mountDnbm } = (await import(
+  test("refuses assets it can't serve before touching the page", async () => {
+    const { mountDnbm, mountDnbmPlayer } = (await import(
       pathToFileURL(join(installed, "lib", "index.js")).href
     )) as typeof import("../src/index");
-    const appended: unknown[] = [];
-    let removed = false;
-    const frame = {
-      title: "",
-      src: "",
-      allow: "",
-      style: { cssText: "" },
-      remove: () => {
-        removed = true;
-      },
-    };
     const container = {
-      ownerDocument: { baseURI: "https://example.com/apps/", createElement: () => frame },
-      append: (node: unknown) => appended.push(node),
+      ownerDocument: {
+        baseURI: "https://example.com/apps/",
+        createElement: () => {
+          throw new Error("touched the page");
+        },
+      },
     } as unknown as HTMLElement;
-
-    const app = mountDnbm(container, { assetsUrl: "../static/dnbm" });
-    expect(appended).toEqual([frame]);
-    expect(frame.src).toBe("https://example.com/static/dnbm/index.html?embed=1");
-    expect(frame.allow).toBe("autoplay");
-    expect(frame.title).toBe("dnbm drum and bass sequencer");
-    app.destroy();
-    expect(removed).toBe(true);
-
-    mountDnbm(container, { assetsUrl: "/dnbm/", branding: true, title: "dnbm" });
-    expect([frame.src, frame.title]).toEqual(["https://example.com/dnbm/index.html", "dnbm"]);
     expect(() => mountDnbm(container, { assetsUrl: "file:///dnbm/" })).toThrow("HTTP or HTTPS");
     expect(() => mountDnbm(container, { assetsUrl: "/dnbm/?v=1" })).toThrow("without a query");
-  });
-
-  test("mounts the player in a frame with its playlist", async () => {
-    const { mountDnbmPlayer } = (await import(
-      pathToFileURL(join(installed, "lib", "index.js")).href
-    )) as typeof import("../src/index");
-    const frame = { title: "", src: "", allow: "", style: { cssText: "" }, remove: () => {} };
-    const container = {
-      ownerDocument: { baseURI: "https://example.com/apps/", createElement: () => frame },
-      append: () => {},
-    } as unknown as HTMLElement;
-
-    mountDnbmPlayer(container, { assetsUrl: "/dnbm" });
-    expect(frame.src).toBe("https://example.com/dnbm/player/index.html?embed=1");
-    expect([frame.title, frame.allow]).toEqual(["dnbm player", "autoplay"]);
-
-    mountDnbmPlayer(container, {
-      assetsUrl: "/dnbm/",
-      branding: true,
-      songs: ["songs/b.dnbm.json", new URL("https://songs.example.org/a.dnbm.json")],
-    });
-    const src = new URL(frame.src);
-    expect(src.pathname).toBe("/dnbm/player/index.html");
-    expect(src.searchParams.has("embed")).toBe(false);
-    expect(src.searchParams.getAll("song")).toEqual([
-      "https://example.com/apps/songs/b.dnbm.json",
-      "https://songs.example.org/a.dnbm.json",
-    ]);
     expect(() => mountDnbmPlayer(container, { assetsUrl: "file:///dnbm/" })).toThrow(
       "HTTP or HTTPS",
+    );
+    expect(() => mountDnbmPlayer(container, { assetsUrl: "/dnbm/#top" })).toThrow(
+      "without a query",
     );
   });
 });
 
-/** Serves a directory over HTTP, mapping directory URLs to their index.html. */
-function serveDirectory(directory: string, hostname: string) {
+/** Serves directories over HTTP by path prefix, mapping directory URLs to index.html. */
+function serve(
+  routes: Record<string, string>,
+  { hostname = "127.0.0.1", headers = {} }: { hostname?: string; headers?: HeadersInit } = {},
+) {
   return Bun.serve({
     hostname,
     port: 0,
     fetch: (request) => {
       const path = new URL(request.url).pathname;
-      const file = Bun.file(join(directory, path.endsWith("/") ? `${path}index.html` : path));
-      return file.size > 0 ? new Response(file) : new Response("Not found", { status: 404 });
+      const prefix = Object.keys(routes)
+        .filter((candidate) => path.startsWith(candidate))
+        .sort((a, b) => b.length - a.length)[0];
+      const directory = prefix === undefined ? undefined : routes[prefix];
+      if (prefix === undefined || directory === undefined) {
+        return new Response("Not found", { status: 404, headers });
+      }
+      const relative = path.slice(prefix.length);
+      const file = Bun.file(
+        join(
+          directory,
+          relative === "" || relative.endsWith("/") ? `${relative}index.html` : relative,
+        ),
+      );
+      return file.size > 0
+        ? new Response(file, { headers })
+        : new Response("Not found", { status: 404, headers });
     },
   });
 }
 
-// The packaged app in a real browser, in a cross-origin frame: the strictest place a
-// host can embed it, where browsers refuse native dialogs and file pickers. Needs
+/** What the host page below exposes to the tests. */
+interface HostWindow {
+  dnbm: typeof import("../src/index");
+  // Not "player": the window already names the element with that id.
+  sequencerApp: DnbmInstance | undefined;
+  playerApp: DnbmInstance | undefined;
+  mountSequencer(): Promise<void>;
+  mountPlayer(): Promise<void>;
+  contexts: AudioContext[];
+  /** Calls to resume an audio context that was already closed. */
+  resumedClosed: number;
+  workers: { terminated: boolean }[];
+  frames: number;
+  /** The shadow root of the app in the container with this id. */
+  shadow(id: string): ShadowRoot;
+  firstReady: string;
+}
+
+// A plain host page, as a2f0.net's experiment is: it imports the package's module and
+// serves the copied assets from its own origin. Its own styles would restyle the app if
+// they reached it, and its own elements share the app's class names.
+const HOST_PAGE = `<!doctype html><meta charset="utf-8"><title>host</title>
+<style>
+  body { margin: 0; font: italic 30px serif; letter-spacing: 4px; color: #777777; }
+  * { line-height: 3; text-transform: uppercase; --bg: #ffffff; --faint: #000000; --fill: 50%; }
+  div { font: italic 30px serif; color: #777777; background: #ffffff; word-spacing: 9px; }
+  button { background: #ffffff; font-size: 30px; }
+  .cell, .track { display: none; }
+  #window, #player { float: left; direction: rtl; }
+</style>
+<input id="outside" aria-label="outside">
+<button class="play" id="host-play">host</button>
+<div id="window" style="width:1200px;height:800px"></div>
+<div id="player" style="width:440px;height:420px"></div>
+<div id="below" style="clear:both;height:3000px"></div>
+<script type="module">
+  import * as dnbm from "/lib/index.js";
+  window.dnbm = dnbm;
+  window.mountSequencer = () => {
+    window.sequencerApp?.destroy();
+    window.sequencerApp = dnbm.mountDnbm(document.getElementById("window"), { assetsUrl: "/dnbm/" });
+    return window.sequencerApp.ready;
+  };
+  window.mountPlayer = () => {
+    window.playerApp?.destroy();
+    window.playerApp = dnbm.mountDnbmPlayer(document.getElementById("player"), {
+      assetsUrl: "/dnbm/",
+      songs: ["/dnbm/songs/wraith.dnbm.json", "/dnbm/songs/undertow.dnbm.json"],
+    });
+    return window.playerApp.ready;
+  };
+</script>`;
+
+/**
+ * Runs in the host page before its scripts: records the audio contexts and animation
+ * frames the apps start, and hides the File System Access pickers, which headless
+ * Chrome can't answer, so saving and opening take their fallbacks.
+ */
+function instrument(): void {
+  const host = window as unknown as HostWindow;
+  host.contexts = [];
+  host.resumedClosed = 0;
+  host.workers = [];
+  host.frames = 0;
+  host.shadow = (id) => {
+    const root = document.querySelector(`#${id} > div`)?.shadowRoot;
+    if (!root) throw new Error(`no app in #${id}`);
+    return root;
+  };
+  const NativeAudioContext = AudioContext;
+  window.AudioContext = class extends NativeAudioContext {
+    constructor(options?: AudioContextOptions) {
+      super(options);
+      host.contexts.push(this);
+    }
+    override resume(): Promise<void> {
+      if (this.state === "closed") host.resumedClosed += 1;
+      return super.resume();
+    }
+  };
+  const NativeWorker = Worker;
+  window.Worker = class extends NativeWorker {
+    private readonly record = { terminated: false };
+    constructor(url: string | URL, options?: WorkerOptions) {
+      super(url, options);
+      host.workers.push(this.record);
+    }
+    override terminate(): void {
+      this.record.terminated = true;
+      super.terminate();
+    }
+  };
+  const nativeFrame = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = (callback) => {
+    host.frames += 1;
+    return nativeFrame(callback);
+  };
+  for (const name of ["showOpenFilePicker", "showSaveFilePicker"]) {
+    Object.defineProperty(window, name, { value: undefined, configurable: true });
+  }
+}
+
+// The packaged apps in a real browser, mounted into a host page's own document. Needs
 // Google Chrome, as on GitHub's runners.
-describe("the packaged app embedded in a cross-origin frame", () => {
+describe("the packaged app mounted in a host page", () => {
   let browser: Browser;
   let page: Page;
-  let frame: Frame;
-  let servers: { stop: (force?: boolean) => Promise<void> }[] = [];
+  let server: ReturnType<typeof serve>;
+  let sequencer: Locator;
+  let player: Locator;
+  const errors: string[] = [];
+
+  /** The number of listeners on the host's window, by event type. */
+  async function windowListeners(): Promise<Record<string, number>> {
+    const session = await page.context().newCDPSession(page);
+    try {
+      const { result } = await session.send("Runtime.evaluate", { expression: "window" });
+      const { listeners } = await session.send("DOMDebugger.getEventListeners", {
+        objectId: result.objectId ?? "",
+      });
+      const counts: Record<string, number> = {};
+      for (const { type } of listeners) counts[type] = (counts[type] ?? 0) + 1;
+      return counts;
+    } finally {
+      await session.detach();
+    }
+  }
 
   beforeAll(async () => {
-    const assets = join(temporary, "cross-origin-assets");
-    const host = join(temporary, "cross-origin-host");
-    const { copyDnbmAssets } = (await import(
-      pathToFileURL(join(installed, "lib", "build.js")).href
-    )) as {
-      copyDnbmAssets: (destination: string) => Promise<void>;
-    };
-    await copyDnbmAssets(join(assets, "dnbm"));
-    await mkdir(host, { recursive: true });
-    await writeFile(join(host, "dnbm.js"), await readFile(join(installed, "lib", "index.js")));
-    const assetServer = serveDirectory(assets, "localhost");
-    await writeFile(
-      join(host, "index.html"),
-      `<!doctype html><meta charset="utf-8"><title>host</title>
-<div id="window" style="width:1200px;height:800px"></div>
-<script type="module">
-  import { mountDnbm } from "/dnbm.js";
-  window.remount = () => {
-    window.dnbm?.destroy();
-    window.dnbm = mountDnbm(document.getElementById("window"), { assetsUrl: "${new URL("/dnbm/", assetServer.url).href}" });
-  };
-  window.remount();
-</script>`,
-    );
-    const hostServer = serveDirectory(host, "127.0.0.1");
-    servers = [assetServer, hostServer];
-    // No autoplay override: audio must start from a click inside the frame.
+    const host = join(temporary, "host");
+    await copyAssets(join(host, "dnbm"));
+    await writeFile(join(host, "index.html"), HOST_PAGE);
+    server = serve({ "/lib/": join(installed, "lib"), "/": host });
+    // No autoplay override: audio must start from a click inside the app.
     browser = await chromium.launch({ channel: "chrome", headless: true });
-    page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1280, height: 860 } });
-    await page.goto(hostServer.url.href);
-    const element = await page.waitForSelector("iframe");
-    const content = await element.contentFrame();
-    if (!content) throw new Error("the iframe has no content frame");
-    frame = content;
-    await frame.waitForSelector(".cell");
+    page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1700, height: 900 } });
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.addInitScript(instrument);
+    await page.goto(server.url.href);
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    sequencer = page.locator("#window");
+    player = page.locator("#player");
   }, 60_000);
 
   afterAll(async () => {
     await browser?.close();
-    for (const server of servers) await server.stop(true);
+    await server?.stop(true);
   });
 
-  test("loads embedded, without the wordmark", async () => {
-    expect(new URL(frame.url()).searchParams.get("embed")).toBe("1");
-    expect(await frame.locator(".brand").isVisible()).toBe(false);
+  test("mounts in a shadow root, ready once it shows, embedded without the wordmark", async () => {
+    expect(await page.locator("iframe").count()).toBe(0);
+    const app = await page.evaluate(() => {
+      const element = document.querySelector("#window > div");
+      const root = element?.shadowRoot;
+      return {
+        role: element?.getAttribute("role"),
+        label: element?.getAttribute("aria-label"),
+        size: [element?.clientWidth, element?.clientHeight],
+        embedded: root?.querySelector(".frame")?.hasAttribute("data-embed"),
+        steps: root?.querySelectorAll(".cell").length,
+        styled: root?.querySelector("link")?.sheet !== null,
+        title: document.title,
+      };
+    });
+    expect(app).toEqual({
+      role: "region",
+      label: "dnbm drum and bass sequencer",
+      size: [1200, 800],
+      embedded: true,
+      steps: expect.any(Number),
+      styled: true,
+      // Only the site's own page shows the song in its title.
+      title: "host",
+    });
+    expect(app.steps).toBeGreaterThan(0);
+    expect(await sequencer.locator(".brand").isVisible()).toBe(false);
+  });
+
+  test("keeps its styles and the host page's apart", async () => {
+    const styles = await page.evaluate(() => {
+      const root = document.querySelector("#window > div")?.shadowRoot;
+      const help = root?.querySelector(".status-help");
+      const cell = root?.querySelector(".cell");
+      const hostPlay = document.getElementById("host-play");
+      if (!help || !cell || !hostPlay) throw new Error("missing elements");
+      const helpStyle = getComputedStyle(help);
+      const frame = root?.querySelector(".frame");
+      return {
+        direction: frame && getComputedStyle(frame).direction,
+        helpFont: [
+          helpStyle.fontSize,
+          helpStyle.fontStyle,
+          helpStyle.letterSpacing,
+          helpStyle.wordSpacing,
+          helpStyle.textTransform,
+          helpStyle.color,
+        ],
+        monospace: helpStyle.fontFamily.includes("monospace"),
+        background: frame && getComputedStyle(frame).backgroundColor,
+        cell: getComputedStyle(cell).display,
+        hostPlay: [getComputedStyle(hostPlay).backgroundColor, getComputedStyle(hostPlay).width],
+      };
+    });
+    // The host's rules for every element and every div, which match the app's own
+    // element, reach nothing inside it.
+    expect(styles.helpFont).toEqual(["11px", "normal", "normal", "0px", "none", "rgb(84, 84, 84)"]);
+    expect(styles.monospace).toBe(true);
+    expect(styles.background).toBe("rgb(10, 10, 10)");
+    // The host's right-to-left containers don't mirror the app.
+    expect(styles.direction).toBe("ltr");
+    expect(styles.cell).toBe("block");
+    // The app's .play rules (a 36px square) never reach the host's own .play button.
+    expect(styles.hostPlay[0]).toBe("rgb(255, 255, 255)");
+    expect(styles.hostPlay[1]).not.toBe("36px");
   });
 
   test("stop cancels playback while the first audio startup is pending", async () => {
@@ -371,24 +537,23 @@ describe("the packaged app embedded in a cross-origin frame", () => {
       await route.continue();
     });
     try {
-      await frame.click(".play");
+      await sequencer.locator(".play").click();
       await requested.promise;
-      expect(await frame.locator(".play").getAttribute("aria-label")).toBe("Stop");
-      await frame.click(".play");
+      expect(await sequencer.locator(".play").getAttribute("aria-label")).toBe("Stop");
+      await sequencer.locator(".play").click();
     } finally {
       released.resolve();
     }
-    await frame.waitForSelector(".master .meter-fill[style]", { state: "attached" });
+    await sequencer.locator(".master .meter-fill[style]").first().waitFor({ state: "attached" });
     // Let several actual audio quanta report after the module has finished loading.
     await page.waitForTimeout(200);
-    expect(await frame.locator(".play").getAttribute("aria-label")).toBe("Play");
-    expect(await frame.locator(".cell.now").count()).toBe(0);
+    expect(await sequencer.locator(".play").getAttribute("aria-label")).toBe("Play");
+    expect(await sequencer.locator(".cell.now").count()).toBe(0);
     await page.unroute("**/engine.wasm");
   }, 20_000);
 
   test("releasing a preview before startup finishes leaves no held bass note", async () => {
-    await frame.goto(frame.url());
-    await frame.waitForSelector(".cell");
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
     const requested = Promise.withResolvers<void>();
     const released = Promise.withResolvers<void>();
     await page.route("**/engine.wasm", async (route) => {
@@ -398,36 +563,54 @@ describe("the packaged app embedded in a cross-origin frame", () => {
     });
     try {
       // A click presses and releases the track before the engine can trigger it.
-      await frame.locator(".track-name").filter({ hasText: /^sub$/ }).click();
+      await sequencer.locator(".track-name").filter({ hasText: /^sub$/ }).click();
       await requested.promise;
     } finally {
       released.resolve();
     }
-    await frame.waitForSelector(".master .meter-fill[style]", { state: "attached" });
+    await sequencer.locator(".master .meter-fill[style]").first().waitFor({ state: "attached" });
     await page.waitForTimeout(300);
-    expect(await frame.locator(".master-peak").textContent()).toBe("−∞ dBFS");
+    expect(await sequencer.locator(".master-peak").textContent()).toBe("−∞ dBFS");
     await page.unroute("**/engine.wasm");
   }, 20_000);
 
-  test("starts audio from a click in the frame", async () => {
-    await frame.click(".play");
+  test("starts audio from a click in the app", async () => {
+    await sequencer.locator(".play").click();
     // The playhead moves only when the worklet reports steps from the running engine.
-    await frame.waitForSelector(".cell.now", { timeout: 10_000 });
-    await frame.click(".play");
+    await sequencer.locator(".cell.now").first().waitFor({ timeout: 10_000 });
+    await sequencer.locator(".play").click();
   }, 20_000);
 
+  test("playing scrolls its own song row, never the host page", async () => {
+    await sequencer.locator(".play").click();
+    await sequencer.locator(".chip.now").waitFor();
+    const first = await sequencer.locator(".chip.now").getAttribute("data-slot");
+    // The host page scrolls the app's top, where the playing slot shows, out of view.
+    await page.evaluate(() => window.scrollTo(0, 600));
+    await page.waitForFunction(
+      (slot) =>
+        (window as unknown as HostWindow)
+          .shadow("window")
+          .querySelector(".chip.now")
+          ?.getAttribute("data-slot") !== slot,
+      first,
+      { timeout: 15_000 },
+    );
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => window.scrollY)).toBe(600);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await sequencer.locator(".play").click();
+  }, 30_000);
+
   test("a held preview releases outside the grid after switching patterns", async () => {
-    const sub = frame.locator(".track-name").filter({ hasText: /^sub$/ });
+    const sub = sequencer.locator(".track-name").filter({ hasText: /^sub$/ });
     const bounds = await sub.boundingBox();
     if (!bounds) throw new Error("sub track is not visible");
     await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
     await page.mouse.down();
-    const subMeter = frame
-      .locator(".strips .strip")
-      .filter({ has: frame.locator(".strip-name").filter({ hasText: /^sub$/ }) })
-      .locator(".meter-fill");
-    await frame.waitForFunction(() => {
-      const strips = [...document.querySelectorAll(".strips .strip")];
+    await page.waitForFunction(() => {
+      const root = (window as unknown as HostWindow).shadow("window");
+      const strips = [...root.querySelectorAll(".strips .strip")];
       const sub = strips.find((strip) => strip.querySelector(".strip-name")?.textContent === "sub");
       return (
         Number.parseFloat(sub?.querySelector<HTMLElement>(".meter-fill")?.style.height ?? "0") > 0
@@ -435,20 +618,18 @@ describe("the packaged app embedded in a cross-origin frame", () => {
     });
     // Follow can replace every row while a pointer is held. Change patterns without
     // releasing the mouse to reproduce that replacement while the note is sounding.
-    await frame
+    await sequencer
       .locator('.tab[data-pattern="roll"]')
       .evaluate((tab: HTMLButtonElement) => tab.click());
     await page.mouse.move(10, 10);
     await page.mouse.up();
-    await frame.waitForFunction(() =>
-      [...document.querySelectorAll<HTMLElement>(".strips .meter-fill")].every(
+    await page.waitForFunction(() => {
+      const root = (window as unknown as HostWindow).shadow("window");
+      return [...root.querySelectorAll<HTMLElement>(".strips .meter-fill")].every(
         (fill) => Number.parseFloat(fill.style.height) === 0,
-      ),
-    );
-    expect(
-      await subMeter.evaluate((fill) => Number.parseFloat((fill as HTMLElement).style.height)),
-    ).toBe(0);
-    const peak = frame.locator(".master-peak");
+      );
+    });
+    const peak = sequencer.locator(".master-peak");
     const held = Number.parseFloat((await peak.textContent()) ?? "");
     expect(Number.isFinite(held)).toBe(true);
     await peak.click();
@@ -458,19 +639,19 @@ describe("the packaged app embedded in a cross-origin frame", () => {
   }, 20_000);
 
   test("track buttons work from the keyboard without editing steps or starting playback", async () => {
-    const row = frame.locator('.grid-row[data-track="0"]');
+    const row = sequencer.locator('.grid-row[data-track="0"]');
     const before = await row
       .locator(".cell")
       .evaluateAll((cells) => cells.map((cell) => cell.getAttribute("aria-label")));
     const mute = row.getByRole("button", { name: "Mute kick", exact: true });
     await mute.press("Enter");
     expect(await mute.getAttribute("aria-pressed")).toBe("true");
-    expect(await frame.locator(".strips .strip").first().getAttribute("class")).toContain(
+    expect(await sequencer.locator(".strips .strip").first().getAttribute("class")).toContain(
       "inaudible",
     );
     await mute.press("Space");
     expect(await mute.getAttribute("aria-pressed")).toBe("false");
-    expect(await frame.locator(".play").getAttribute("aria-label")).toBe("Play");
+    expect(await sequencer.locator(".play").getAttribute("aria-label")).toBe("Play");
     expect(
       await row
         .locator(".cell")
@@ -478,65 +659,133 @@ describe("the packaged app embedded in a cross-origin frame", () => {
     ).toEqual(before);
     // Selecting a track with Enter auditions it, without entering a grid step.
     await row.locator(".track-name").press("Enter");
-    expect(await frame.inputValue(".device-name")).toBe("kick");
+    expect(await sequencer.locator(".device-name").inputValue()).toBe("kick");
   }, 20_000);
 
   test("browsing a pattern pauses follow and returning to follow restores the playhead", async () => {
-    await frame.click(".play");
-    await frame.waitForSelector(".cell.now");
-    const selected = frame.locator('.tab[data-pattern="pressure"]');
+    await sequencer.locator(".play").click();
+    await sequencer.locator(".cell.now").first().waitFor();
+    const selected = sequencer.locator('.tab[data-pattern="pressure"]');
     await selected.click();
     expect(await selected.getAttribute("aria-selected")).toBe("true");
-    const follow = frame.getByRole("button", { name: "follow", exact: true });
+    const follow = sequencer.getByRole("button", { name: "follow", exact: true });
     expect(await follow.getAttribute("aria-pressed")).toBe("false");
     await page.waitForTimeout(200);
     expect(await selected.getAttribute("aria-selected")).toBe("true");
-    expect(await frame.locator(".cell.now").count()).toBe(0);
+    expect(await sequencer.locator(".cell.now").count()).toBe(0);
     await follow.click();
-    await frame.waitForFunction(() => {
-      const playing = document.querySelector(".chip.now");
+    await page.waitForFunction(() => {
+      const root = (window as unknown as HostWindow).shadow("window");
+      const playing = root.querySelector(".chip.now");
       return (
         playing &&
-        document.querySelector('.tab[aria-selected="true"]')?.textContent === playing.textContent
+        root.querySelector('.tab[aria-selected="true"]')?.textContent === playing.textContent
       );
     });
-    await frame.waitForSelector(".cell.now");
-    await frame.click(".play");
+    await sequencer.locator(".cell.now").first().waitFor();
+    await sequencer.locator(".play").click();
   }, 20_000);
 
   test("Space controls playback after mouse clicks without repeating the clicked action", async () => {
-    const mute = frame.locator('.grid-row[data-track="0"] [data-action="mute"]');
+    const mute = sequencer.locator('.grid-row[data-track="0"] [data-action="mute"]');
     await mute.click();
     await page.keyboard.press("Space");
-    await frame.waitForSelector(".cell.now");
+    await sequencer.locator(".cell.now").first().waitFor();
     expect(await mute.getAttribute("aria-pressed")).toBe("true");
     await page.keyboard.press("Space");
-    expect(await frame.locator(".play").getAttribute("aria-label")).toBe("Play");
+    expect(await sequencer.locator(".play").getAttribute("aria-label")).toBe("Play");
     expect(await mute.getAttribute("aria-pressed")).toBe("true");
     await mute.click();
   }, 20_000);
 
-  test("asks before discarding edits with an in-app dialog", async () => {
-    await frame.locator('.grid-row[data-track="0"] .cell').nth(1).click();
-    await frame.click('button:text-is("new")');
-    const dialog = frame.getByRole("dialog", { name: "Discard unsaved changes to this song?" });
-    await dialog.waitFor();
-    await dialog.locator('button:text-is("discard")').click();
-    await frame.waitForFunction(
-      () => document.querySelector<HTMLInputElement>(".title")?.value === "Untitled",
+  test("runs beside the player, each taking only its own keys", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountPlayer());
+    expect(await player.locator(".track-title").allTextContents()).toEqual(["Wraith", "Undertow"]);
+    const playerState = () => player.locator(".player").getAttribute("data-state");
+    const sequencerPlaying = async () =>
+      (await sequencer.locator(".play").getAttribute("aria-label")) === "Stop";
+
+    // Keys on the host page reach neither app.
+    await page.locator("#outside").focus();
+    await page.keyboard.press("Space");
+    await page.mouse.click(1650, 880);
+    await page.keyboard.press("Space");
+    await page.keyboard.press("x");
+    await page.waitForTimeout(300);
+    expect([await sequencerPlaying(), await playerState()]).toEqual([false, "stopped"]);
+
+    // A press anywhere in the player gives it the keyboard, and only it.
+    await player.locator(".summary").click();
+    await page.keyboard.press("Space");
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("player").querySelector(".time")?.textContent !==
+        "0:00",
+      undefined,
+      { timeout: 15_000 },
     );
+    expect([await sequencerPlaying(), await playerState()]).toEqual([false, "playing"]);
+
+    // A press anywhere in the sequencer moves the keyboard there; both play at once.
+    await sequencer.locator(".statusbar").click();
+    await page.keyboard.press("Space");
+    await sequencer.locator(".cell.now").first().waitFor();
+    expect([await sequencerPlaying(), await playerState()]).toEqual([true, "playing"]);
+
+    // Closing the player leaves the sequencer playing; reopening it starts afresh.
+    await page.evaluate(() => (window as unknown as HostWindow).mountPlayer());
+    expect(await playerState()).toBe("stopped");
+    await page.waitForTimeout(200);
+    expect(await sequencerPlaying()).toBe(true);
+    await page.keyboard.press("Space");
+    expect(await sequencerPlaying()).toBe(false);
+    await page.evaluate(() => (window as unknown as HostWindow).playerApp?.destroy());
+  }, 40_000);
+
+  test("asks before discarding edits with a dialog inside the app", async () => {
+    await sequencer.locator('.grid-row[data-track="0"] .cell').nth(1).click();
+    await sequencer.locator('button:text-is("new")').click();
+    const dialog = sequencer.getByRole("dialog", { name: "Discard unsaved changes to this song?" });
+    await dialog.waitFor();
+    const placement = await page.evaluate(() => {
+      const root = document.querySelector("#window > div")?.shadowRoot;
+      return {
+        inRoot: root?.querySelector("dialog[open]") !== null,
+        inDocument: document.querySelectorAll("dialog").length,
+        appInert: root?.querySelector<HTMLElement>(".frame")?.inert,
+      };
+    });
+    expect(placement).toEqual({ inRoot: true, inDocument: 0, appInert: true });
+    // The rest of the host page stays usable.
+    await page.locator("#outside").focus();
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe("outside");
+    await dialog.locator('button:text-is("discard")').click();
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("window").querySelector<HTMLInputElement>(".title")
+          ?.value === "Untitled",
+    );
+    expect(
+      await page.evaluate(
+        () =>
+          (window as unknown as HostWindow).shadow("window").querySelector<HTMLElement>(".frame")
+            ?.inert,
+      ),
+    ).toBe(false);
   }, 20_000);
 
   test("cancel and Escape keep unsaved edits", async () => {
-    const step = frame.locator('.grid-row[data-track="0"] .cell').nth(2);
+    const step = sequencer.locator('.grid-row[data-track="0"] .cell').nth(2);
     await step.click();
     expect(await step.getAttribute("class")).toContain("hit");
     for (const dismiss of ["cancel", "Escape"]) {
-      await frame.click('button:text-is("new")');
-      const dialog = frame.getByRole("dialog", { name: "Discard unsaved changes to this song?" });
+      await sequencer.locator('button:text-is("new")').click();
+      const dialog = sequencer.getByRole("dialog", {
+        name: "Discard unsaved changes to this song?",
+      });
       await dialog.waitFor();
       if (dismiss === "cancel") await dialog.locator('button:text-is("cancel")').click();
-      else await frame.press("dialog[open]", "Escape");
+      else await page.keyboard.press("Escape");
       await dialog.waitFor({ state: "detached" });
       expect([dismiss, await step.getAttribute("class")]).toEqual([
         dismiss,
@@ -545,37 +794,37 @@ describe("the packaged app embedded in a cross-origin frame", () => {
     }
   }, 20_000);
 
-  test("renames a pattern through an in-app prompt, and keeps it on cancel", async () => {
-    const prompt = frame.getByRole("dialog", { name: /Pattern id/ });
-    await frame.click('button:text-is("rename")');
+  test("renames a pattern through a prompt inside the app, and keeps it on cancel", async () => {
+    const prompt = sequencer.getByRole("dialog", { name: /Pattern id/ });
+    await sequencer.locator('button:text-is("rename")').click();
     await prompt.waitFor();
     expect(await prompt.locator("input").inputValue()).toBe("a");
     await prompt.locator("input").fill("intro");
     await prompt.locator("input").press("Enter");
-    await frame.waitForSelector('.tab[data-pattern="intro"]');
-    expect(await frame.locator(".chip").allTextContents()).toEqual(["intro"]);
+    await sequencer.locator('.tab[data-pattern="intro"]').waitFor();
+    expect(await sequencer.locator(".chip").allTextContents()).toEqual(["intro"]);
 
-    await frame.click('button:text-is("rename")');
+    await sequencer.locator('button:text-is("rename")').click();
     await prompt.locator("input").fill("ignored");
     await prompt.locator('button:text-is("cancel")').click();
     await prompt.waitFor({ state: "detached" });
-    expect(await frame.locator(".tab").allTextContents()).toEqual(["intro"]);
+    expect(await sequencer.locator(".tab").allTextContents()).toEqual(["intro"]);
   }, 20_000);
 
-  test("saves by downloading when the frame may not show a file picker", async () => {
+  test("saves by downloading where the page has no file picker", async () => {
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      frame.click('button:text-is("save")'),
+      sequencer.locator('button:text-is("save")').click(),
     ]);
     expect(download.suggestedFilename()).toBe("untitled.dnbm.json");
     // The rename test's edit is unsaved; saving marks the song clean.
   }, 20_000);
 
-  test("opens a song through a file input after the discard prompt, when the frame may not show a picker", async () => {
-    await frame.locator('.grid-row[data-track="0"] .cell').nth(3).click();
+  test("opens a song through a file input after the discard prompt, where the page has no picker", async () => {
+    await sequencer.locator('.grid-row[data-track="0"] .cell').nth(3).click();
     const chooser = page.waitForEvent("filechooser");
-    await frame.click('button:text-is("open")');
-    await frame
+    await sequencer.locator('.files button:text-is("open")').click();
+    await sequencer
       .getByRole("dialog", { name: "Discard unsaved changes to this song?" })
       .locator('button:text-is("discard")')
       .click();
@@ -585,87 +834,487 @@ describe("the packaged app embedded in a cross-origin frame", () => {
       mimeType: "application/json",
       buffer: song,
     });
-    await frame.waitForFunction(
-      () => document.querySelector<HTMLInputElement>(".title")?.value === "Undertow",
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("window").querySelector<HTMLInputElement>(".title")
+          ?.value === "Undertow",
     );
-    expect(await frame.textContent(".status-message")).toBe("Opened undertow.dnbm.json.");
+    expect(await sequencer.locator(".status-message").textContent()).toBe(
+      "Opened undertow.dnbm.json.",
+    );
   }, 20_000);
 
   test("cancelling the file input keeps the song", async () => {
     const chooser = page.waitForEvent("filechooser");
     // The song was just opened, so there is nothing to discard and no prompt.
-    await frame.click('button:text-is("open")');
+    await sequencer.locator('.files button:text-is("open")').click();
     await (await chooser).setFiles([]);
-    expect(await frame.inputValue(".title")).toBe("Undertow");
-    expect(await frame.locator("dialog[open]").count()).toBe(0);
-    expect(await frame.textContent(".status-message")).toBe("Opened undertow.dnbm.json.");
+    expect(await sequencer.locator(".title").inputValue()).toBe("Undertow");
+    expect(await sequencer.locator("dialog[open]").count()).toBe(0);
+    expect(await sequencer.locator(".status-message").textContent()).toBe(
+      "Opened undertow.dnbm.json.",
+    );
+  }, 20_000);
+
+  test("opens a song file dropped on the app", async () => {
+    const text = await readFile(join(installed, "site", "songs", "wraith.dnbm.json"), "utf8");
+    const dataTransfer = await page.evaluateHandle((song) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([song], "wraith.dnbm.json", { type: "application/json" }));
+      return transfer;
+    }, text);
+    const grid = sequencer.locator(".grid-scroll");
+    await grid.dispatchEvent("dragover", { dataTransfer });
+    await grid.dispatchEvent("drop", { dataTransfer });
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("window").querySelector<HTMLInputElement>(".title")
+          ?.value === "Wraith",
+    );
+    expect(await sequencer.locator(".status-message").textContent()).toBe(
+      "Opened wraith.dnbm.json.",
+    );
   }, 20_000);
 
   test("keeps an edit made just before the host destroys and remounts the app", async () => {
-    await frame.fill(".title", "Night Bus");
+    await sequencer.locator(".title").fill("Night Bus");
     // Commit the edit, then destroy and remount at once: milliseconds, not the
     // hundreds a delayed autosave would need.
-    await frame.evaluate(() =>
-      document.querySelector(".title")?.dispatchEvent(new Event("change")),
-    );
-    await page.evaluate(() => (window as unknown as { remount(): void }).remount());
-    const element = await page.waitForSelector("iframe");
-    const content = await element.contentFrame();
-    if (!content) throw new Error("the iframe has no content frame");
-    frame = content;
-    await frame.waitForSelector(".cell");
-    expect(await frame.inputValue(".title")).toBe("Night Bus");
+    await sequencer.locator(".title").evaluate((title) => title.dispatchEvent(new Event("change")));
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    expect(await sequencer.locator(".title").inputValue()).toBe("Night Bus");
   }, 20_000);
 
-  test("destroy removes the frame", async () => {
-    await page.evaluate(() => (window as unknown as { dnbm: { destroy(): void } }).dnbm.destroy());
-    expect(await page.locator("iframe").count()).toBe(0);
-  });
+  test("opens the song autosaved under the keys earlier versions used", async () => {
+    const song = (
+      await readFile(join(installed, "site", "songs", "wraith.dnbm.json"), "utf8")
+    ).replace(/"title": "[^"]*"/, '"title": "Saved Before"');
+    expect(
+      JSON.parse(await page.evaluate(() => localStorage.getItem("dnbm:song") ?? "{}")) as {
+        title?: string;
+      },
+    ).toMatchObject({ title: "Night Bus" });
+    await page.evaluate((text) => {
+      localStorage.setItem("dnbm:song", text);
+      localStorage.setItem("dnbm:saved", text);
+    }, song);
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    expect(await sequencer.locator(".title").inputValue()).toBe("Saved Before");
+    expect(await sequencer.locator(".status-file").textContent()).not.toContain("●");
+  }, 20_000);
+
+  test("a file picked after the host destroys the app opens nothing", async () => {
+    // The song is clean, so open asks for a file at once; the host then remounts.
+    const chooser = page.waitForEvent("filechooser");
+    await sequencer.locator('.files button:text-is("open")').click();
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    const song = await readFile(join(installed, "site", "songs", "undertow.dnbm.json"));
+    await (await chooser).setFiles({
+      name: "undertow.dnbm.json",
+      mimeType: "application/json",
+      buffer: song,
+    });
+    await page.waitForTimeout(500);
+    expect(await sequencer.locator(".title").inputValue()).toBe("Saved Before");
+    expect(
+      JSON.parse(await page.evaluate(() => localStorage.getItem("dnbm:song") ?? "{}")) as {
+        title?: string;
+      },
+    ).toMatchObject({ title: "Saved Before" });
+  }, 20_000);
+
+  test("a file chosen in Save As after the host destroys the app is never written", async () => {
+    // A picker the page can answer later, as a user would, writing to a file it records.
+    await page.evaluate(() => {
+      const host = window as unknown as HostWindow & {
+        answerPicker?: () => void;
+        written?: string[];
+      };
+      host.written = [];
+      Object.defineProperty(window, "showSaveFilePicker", {
+        configurable: true,
+        value: () =>
+          new Promise((resolve) => {
+            host.answerPicker = () =>
+              resolve({
+                name: "chosen.dnbm.json",
+                createWritable: async () => ({
+                  write: async (text: string) => host.written?.push(text),
+                  close: async () => {},
+                  abort: async () => {},
+                }),
+              });
+          }),
+      });
+    });
+    try {
+      await sequencer.locator('.files button:text-is("save")').click();
+      await page.waitForFunction(
+        () => (window as unknown as { answerPicker?: unknown }).answerPicker !== undefined,
+      );
+      await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+      await page.evaluate(() => (window as unknown as { answerPicker(): void }).answerPicker());
+      await page.waitForTimeout(300);
+      expect(
+        await page.evaluate(() => (window as unknown as { written: string[] }).written),
+      ).toEqual([]);
+    } finally {
+      await page.evaluate(() =>
+        Object.defineProperty(window, "showSaveFilePicker", {
+          configurable: true,
+          value: undefined,
+        }),
+      );
+    }
+  }, 20_000);
+
+  test("a play or preview pressed as the host destroys the apps touches no closed audio", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    await page.evaluate(() => (window as unknown as HostWindow).mountPlayer());
+    // Start both engines, then stop.
+    await sequencer.locator(".play").click();
+    await sequencer.locator(".cell.now").first().waitFor({ timeout: 10_000 });
+    await sequencer.locator(".play").click();
+    await player.locator(".control.play").click();
+    await player.locator('.player[data-state="playing"]').waitFor();
+    await player.locator(".control.stop").click();
+    const late = await page.evaluate(async () => {
+      const host = window as unknown as HostWindow;
+      const before = host.resumedClosed;
+      // Each press awaits the started engine, and the host destroys the apps before
+      // that await resumes.
+      host.shadow("window").querySelector<HTMLButtonElement>(".play")?.click();
+      host.shadow("window").querySelector<HTMLButtonElement>(".track-name")?.click();
+      host.shadow("player").querySelector<HTMLButtonElement>(".control.play")?.click();
+      host.sequencerApp?.destroy();
+      host.playerApp?.destroy();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return host.resumedClosed - before;
+    });
+    expect(late).toBe(0);
+    expect(errors).toEqual([]);
+  }, 30_000);
+
+  test("a save the host's destroy interrupts leaves the file as it was", async () => {
+    // A picker answered at once, writing to a file whose write finishes when the test says.
+    await page.evaluate(() => {
+      const host = window as unknown as HostWindow & {
+        finishWrite?: () => void;
+        file?: string[];
+      };
+      host.file = [];
+      Object.defineProperty(window, "showSaveFilePicker", {
+        configurable: true,
+        value: async () => ({
+          name: "chosen.dnbm.json",
+          createWritable: async () => ({
+            write: () =>
+              new Promise<void>((resolve) => {
+                host.finishWrite = resolve;
+              }),
+            close: async () => host.file?.push("closed"),
+            abort: async () => host.file?.push("aborted"),
+          }),
+        }),
+      });
+    });
+    try {
+      await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+      await sequencer.locator('.files button:text-is("save")').click();
+      await page.waitForFunction(
+        () => (window as unknown as { finishWrite?: unknown }).finishWrite !== undefined,
+      );
+      await page.evaluate(() => {
+        (window as unknown as HostWindow).sequencerApp?.destroy();
+        (window as unknown as { finishWrite(): void }).finishWrite();
+      });
+      await page.waitForTimeout(300);
+      expect(await page.evaluate(() => (window as unknown as { file: string[] }).file)).toEqual([
+        "aborted",
+      ]);
+    } finally {
+      await page.evaluate(() =>
+        Object.defineProperty(window, "showSaveFilePicker", {
+          configurable: true,
+          value: undefined,
+        }),
+      );
+    }
+  }, 20_000);
+
+  test("destroying the app while its audio starts closes the audio context", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    const requested = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    await page.route("**/engine.wasm", async (route) => {
+      requested.resolve();
+      await released.promise;
+      await route.continue();
+    });
+    try {
+      const before = await page.evaluate(() => (window as unknown as HostWindow).contexts.length);
+      await sequencer.locator(".play").click();
+      await requested.promise;
+      expect(await page.evaluate(() => (window as unknown as HostWindow).contexts.length)).toBe(
+        before + 1,
+      );
+      await page.evaluate(() => (window as unknown as HostWindow).sequencerApp?.destroy());
+    } finally {
+      released.resolve();
+    }
+    await page.waitForFunction(() =>
+      (window as unknown as HostWindow).contexts.every((context) => context.state === "closed"),
+    );
+    // Once the engine's module arrives, nothing restarts or reopens audio.
+    await page.waitForTimeout(500);
+    expect(
+      await page.evaluate(() =>
+        (window as unknown as HostWindow).contexts.every((context) => context.state === "closed"),
+      ),
+    ).toBe(true);
+    await page.unroute("**/engine.wasm");
+  }, 20_000);
+
+  test("destroying the app just as its engine reports ready closes the audio context", async () => {
+    await page.evaluate(() => {
+      const host = window as unknown as HostWindow;
+      host.sequencerApp?.destroy();
+      // Destroy the app right after the worklet's ready message is handled, before the
+      // engine's start goes on.
+      const property = Object.getOwnPropertyDescriptor(MessagePort.prototype, "onmessage");
+      Object.defineProperty(MessagePort.prototype, "onmessage", {
+        configurable: true,
+        get(this: MessagePort) {
+          return property?.get?.call(this);
+        },
+        set(this: MessagePort, handler: ((event: MessageEvent) => void) | null) {
+          property?.set?.call(
+            this,
+            handler &&
+              function (this: MessagePort, event: MessageEvent) {
+                handler.call(this, event);
+                if ((event.data as { type?: string })?.type === "ready") {
+                  if (property) Object.defineProperty(MessagePort.prototype, "onmessage", property);
+                  host.sequencerApp?.destroy();
+                }
+              },
+          );
+        },
+      });
+    });
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    await sequencer.locator(".play").click();
+    await page.waitForFunction(() => document.querySelector("#window > div") === null);
+    await page.waitForTimeout(500);
+    expect(
+      await page.evaluate(() =>
+        (window as unknown as HostWindow).contexts.map((context) => context.state),
+      ),
+    ).not.toContain("running");
+    expect(
+      await page.evaluate(() =>
+        (window as unknown as HostWindow).contexts.every((context) => context.state === "closed"),
+      ),
+    ).toBe(true);
+  }, 20_000);
+
+  test("destroying the app during a WAV export stops its worker and downloads nothing", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    const downloads: string[] = [];
+    const record = (download: { suggestedFilename(): string }) =>
+      downloads.push(download.suggestedFilename());
+    page.on("download", record);
+    try {
+      const before = await page.evaluate(() => (window as unknown as HostWindow).workers.length);
+      await sequencer.locator('.files button:text-is("export")').click();
+      await page.waitForFunction(
+        (count) => (window as unknown as HostWindow).workers.length > count,
+        before,
+      );
+      await page.evaluate(() => (window as unknown as HostWindow).sequencerApp?.destroy());
+      expect(
+        await page.evaluate(() =>
+          (window as unknown as HostWindow).workers.every((worker) => worker.terminated),
+        ),
+      ).toBe(true);
+      // The export would have finished in this time.
+      await page.waitForTimeout(3_000);
+      expect(downloads).toEqual([]);
+    } finally {
+      page.off("download", record);
+    }
+  }, 20_000);
+
+  test("destroying the app just as its export's engine arrives starts no worker", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    const before = await page.evaluate(() => {
+      // Destroy the app once the export's engine bytes are read, before the export
+      // goes on.
+      const host = window as unknown as HostWindow;
+      const native = Response.prototype.arrayBuffer;
+      Response.prototype.arrayBuffer = async function (this: Response) {
+        const bytes = await native.call(this);
+        if (this.url.endsWith("/engine.wasm")) {
+          Response.prototype.arrayBuffer = native;
+          host.sequencerApp?.destroy();
+        }
+        return bytes;
+      };
+      return host.workers.length;
+    });
+    await sequencer.locator('.files button:text-is("export")').click();
+    await page.waitForFunction(() => document.querySelector("#window > div") === null);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as unknown as HostWindow).workers.length)).toBe(
+      before,
+    );
+  }, 20_000);
+
+  test("destroy releases the audio context, animation frames, listeners and element", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).sequencerApp?.destroy());
+    const baseline = await windowListeners();
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    await page.evaluate(() => (window as unknown as HostWindow).mountPlayer());
+    await sequencer.locator(".play").click();
+    await sequencer.locator(".cell.now").first().waitFor({ timeout: 10_000 });
+    await player.locator(".control.play").click();
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).contexts.filter((context) => context.state === "running")
+          .length === 2,
+    );
+    expect(await windowListeners()).not.toEqual(baseline);
+
+    await page.evaluate(() => {
+      const host = window as unknown as HostWindow;
+      host.sequencerApp?.destroy();
+      host.playerApp?.destroy();
+      // Again, as a host's cleanup might: it does nothing.
+      host.sequencerApp?.destroy();
+    });
+    expect(await page.locator("#window > *, #player > *").count()).toBe(0);
+    // Every context the apps started, in this test and the ones before, is closed.
+    await page.waitForFunction(() =>
+      (window as unknown as HostWindow).contexts.every((context) => context.state === "closed"),
+    );
+    const frames = await page.evaluate(() => (window as unknown as HostWindow).frames);
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => (window as unknown as HostWindow).frames)).toBe(frames);
+    expect(await windowListeners()).toEqual(baseline);
+  }, 30_000);
+
+  test("mount, destroy while loading, and mount again shows one app", async () => {
+    // A fresh page, whose first mount still has its module and stylesheet to fetch.
+    const fresh = await browser.newPage({ viewport: { width: 1700, height: 900 } });
+    try {
+      await fresh.addInitScript(instrument);
+      const released = Promise.withResolvers<void>();
+      await fresh.route("**/dnbm/mount.js", async (route) => {
+        await released.promise;
+        await route.continue();
+      });
+      await fresh.goto(server.url.href);
+      await fresh.evaluate(() => {
+        // What React Strict Mode does to an effect: mount, clean up, and mount again.
+        const host = window as unknown as HostWindow;
+        const container = document.getElementById("window") as HTMLElement;
+        const first = host.dnbm.mountDnbm(container, { assetsUrl: "/dnbm/" });
+        first.destroy();
+        host.firstReady = "pending";
+        first.ready.then(
+          () => {
+            host.firstReady = "resolved";
+          },
+          () => {
+            host.firstReady = "rejected";
+          },
+        );
+        void host.mountSequencer();
+      });
+      await fresh.waitForTimeout(200);
+      expect(await fresh.locator("#window .app").count()).toBe(0);
+      released.resolve();
+      await fresh.evaluate(() => (window as unknown as HostWindow).sequencerApp?.ready);
+      await fresh.waitForTimeout(500);
+      // A destroyed instance's `ready` never settles, as a removed frame never loads.
+      expect(await fresh.evaluate(() => (window as unknown as HostWindow).firstReady)).toBe(
+        "pending",
+      );
+      expect(await fresh.locator("#window > div").count()).toBe(1);
+      expect(await fresh.locator("#window .app").count()).toBe(1);
+      expect(await fresh.locator("#window .cell").count()).toBeGreaterThan(0);
+    } finally {
+      await fresh.close();
+    }
+  }, 20_000);
+
+  test("ready rejects, and the app says why, when its assets are missing", async () => {
+    const result = await page.evaluate(async () => {
+      const window_ = window as unknown as HostWindow;
+      const container = document.getElementById("player") as HTMLElement;
+      const app = window_.dnbm.mountDnbmPlayer(container, { assetsUrl: "/missing/" });
+      const outcome = await app.ready.then(
+        () => "resolved",
+        (error: unknown) => `rejected: ${error instanceof Error ? error.name : error}`,
+      );
+      const failure = app.element.shadowRoot?.querySelector(".failure");
+      const message = failure?.textContent;
+      // Readable without the stylesheet that failed to load.
+      const colour = failure && getComputedStyle(failure).color;
+      app.destroy();
+      return { outcome, message, colour };
+    });
+    expect(result.outcome).toStartWith("rejected");
+    expect(result.message).toStartWith("dnbm couldn't start:");
+    expect(result.colour).toBe("rgb(138, 138, 138)");
+    expect(errors).toEqual([]);
+  }, 20_000);
 });
 
-// The packaged player in a cross-origin frame, given a playlist by the host.
-describe("the packaged player embedded in a cross-origin frame", () => {
+// The packaged apps with their assets on another origin, which serves them with CORS.
+describe("the packaged app with its assets on another origin", () => {
   let browser: Browser;
-  let frame: Frame;
+  let page: Page;
   let servers: { stop: (force?: boolean) => Promise<void> }[] = [];
 
   beforeAll(async () => {
-    const assets = join(temporary, "player-assets");
-    const host = join(temporary, "player-host");
-    const { copyDnbmAssets } = (await import(
-      pathToFileURL(join(installed, "lib", "build.js")).href
-    )) as {
-      copyDnbmAssets: (destination: string) => Promise<void>;
-    };
-    await copyDnbmAssets(join(assets, "dnbm"));
-    await mkdir(host, { recursive: true });
-    await writeFile(join(host, "dnbm.js"), await readFile(join(installed, "lib", "index.js")));
-    const assetServer = serveDirectory(assets, "localhost");
-    const songs = ["wraith", "undertow"].map(
-      (name) => new URL(`/dnbm/songs/${name}.dnbm.json`, assetServer.url).href,
+    const assets = join(temporary, "cross-origin-assets");
+    const host = join(temporary, "cross-origin-host");
+    await copyAssets(join(assets, "dnbm"));
+    const assetServer = serve(
+      { "/": assets },
+      { hostname: "localhost", headers: { "Access-Control-Allow-Origin": "*" } },
     );
+    const assetsUrl = new URL("/dnbm/", assetServer.url).href;
+    const songs = ["wraith", "undertow"].map(
+      (name) => new URL(`songs/${name}.dnbm.json`, assetsUrl).href,
+    );
+    await mkdir(host, { recursive: true });
     await writeFile(
       join(host, "index.html"),
       `<!doctype html><meta charset="utf-8"><title>host</title>
-<div id="window" style="width:440px;height:420px"></div>
+<div id="window" style="width:1200px;height:800px"></div>
+<div id="player" style="width:440px;height:420px"></div>
 <script type="module">
-  import { mountDnbmPlayer } from "/dnbm.js";
-  mountDnbmPlayer(document.getElementById("window"), {
-    assetsUrl: "${new URL("/dnbm/", assetServer.url).href}",
+  import { mountDnbm, mountDnbmPlayer } from "/lib/index.js";
+  mountDnbm(document.getElementById("window"), { assetsUrl: "${assetsUrl}" });
+  mountDnbmPlayer(document.getElementById("player"), {
+    assetsUrl: "${assetsUrl}",
     songs: ${JSON.stringify(songs)},
   });
 </script>`,
     );
-    const hostServer = serveDirectory(host, "127.0.0.1");
+    const hostServer = serve({ "/lib/": join(installed, "lib"), "/": host });
     servers = [assetServer, hostServer];
     browser = await chromium.launch({ channel: "chrome", headless: true });
-    const page = await browser.newPage({ viewport: { width: 600, height: 500 } });
+    page = await browser.newPage({
+      acceptDownloads: true,
+      viewport: { width: 1280, height: 1300 },
+    });
+    await page.addInitScript(instrument);
     await page.goto(hostServer.url.href);
-    const element = await page.waitForSelector("iframe");
-    const content = await element.contentFrame();
-    if (!content) throw new Error("the iframe has no content frame");
-    frame = content;
-    await frame.waitForSelector(".track");
+    await page.locator("#window .cell").first().waitFor();
+    await page.locator("#player .track").first().waitFor();
   }, 60_000);
 
   afterAll(async () => {
@@ -673,26 +1322,122 @@ describe("the packaged player embedded in a cross-origin frame", () => {
     for (const server of servers) await server.stop(true);
   });
 
-  test("lists the host's songs in its order, embedded, filling the frame", async () => {
-    expect(await frame.locator(".track-title").allTextContents()).toEqual(["Wraith", "Undertow"]);
-    expect(await frame.locator(".bar").isVisible()).toBe(false);
-    const size = await frame.evaluate(() => {
-      const player = document.querySelector(".player")?.getBoundingClientRect();
+  test("plays, and exports a WAV through its worker", async () => {
+    const sequencer = page.locator("#window");
+    await sequencer.locator(".play").click();
+    await sequencer.locator(".cell.now").first().waitFor({ timeout: 10_000 });
+    await sequencer.locator(".play").click();
+    // A new song is short, so it renders in a moment.
+    await sequencer.locator('button:text-is("new")').click();
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("window").querySelector<HTMLInputElement>(".title")
+          ?.value === "Untitled",
+    );
+    const [download] = await Promise.all([
+      page.waitForEvent("download", { timeout: 20_000 }),
+      sequencer.locator('button:text-is("export")').click(),
+    ]);
+    expect(download.suggestedFilename()).toBe("untitled.wav");
+  }, 40_000);
+
+  test("lists the host's songs in its order, embedded, filling its container", async () => {
+    const player = page.locator("#player");
+    expect(await player.locator(".track-title").allTextContents()).toEqual(["Wraith", "Undertow"]);
+    expect(await player.locator(".bar").isVisible()).toBe(false);
+    const size = await page.evaluate(() => {
+      const root = document.querySelector("#player > div")?.shadowRoot;
+      const frame = root?.querySelector(".frame");
+      const box = root?.querySelector(".player")?.getBoundingClientRect();
       return {
-        width: player?.width,
-        height: player?.height,
-        scrolls: document.documentElement.scrollHeight > innerHeight,
+        width: box?.width,
+        height: box?.height,
+        scrolls: (frame?.scrollHeight ?? 0) > (frame?.clientHeight ?? 0),
       };
     });
     expect(size).toEqual({ width: 440, height: 420, scrolls: false });
   });
 
-  test("plays from a click in the frame", async () => {
-    await frame.locator(".control.play").click();
-    await frame.waitForFunction(() => document.querySelector(".time")?.textContent !== "0:00", {
-      timeout: 15_000,
+  test("plays from a click in the player", async () => {
+    const player = page.locator("#player");
+    await player.locator(".control.play").click();
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("player").querySelector(".time")?.textContent !==
+        "0:00",
+      undefined,
+      { timeout: 15_000 },
+    );
+    expect(await player.locator(".player").getAttribute("data-state")).toBe("playing");
+    expect(await player.locator(".status").textContent()).toBe("");
+  }, 30_000);
+});
+
+// The site's own pages, as dnbm.a2f0.net serves them: under its content security
+// policy, they mount the apps through the same shell and app modules as a host.
+describe("the packaged site's own pages", () => {
+  let browser: Browser;
+  let server: ReturnType<typeof serve>;
+
+  beforeAll(async () => {
+    const text = await readFile(join(ROOT, "packages", "sequencer", "_headers"), "utf8");
+    const headers: Record<string, string> = {};
+    for (const line of text.split("\n")) {
+      const match = /^\s+([\w-]+):\s*(.+)$/.exec(line);
+      if (match?.[1] && match[2]) headers[match[1]] = match[2];
+    }
+    expect(headers["Content-Security-Policy"]).toContain("style-src 'self'");
+    server = serve({ "/": join(installed, "site") }, { headers });
+    browser = await chromium.launch({ channel: "chrome", headless: true });
+  }, 60_000);
+
+  afterAll(async () => {
+    await browser?.close();
+    await server?.stop(true);
+  });
+
+  /** Opens a page, collecting errors and content security policy violations. */
+  async function open(path: string): Promise<{ page: Page; problems: string[] }> {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+    const problems: string[] = [];
+    page.on("pageerror", (error) => problems.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") problems.push(message.text());
     });
-    expect(await frame.locator(".player").getAttribute("data-state")).toBe("playing");
-    expect(await frame.locator(".status").textContent()).toBe("");
+    await page.goto(new URL(path, server.url).href);
+    return { page, problems };
+  }
+
+  test("the sequencer shows its wordmark, titles the page with the song, and plays", async () => {
+    const { page, problems } = await open("/");
+    try {
+      await page.locator(".cell").first().waitFor();
+      expect(await page.locator(".brand").isVisible()).toBe(true);
+      expect(await page.title()).toBe("Undertow · dnbm");
+      await page.locator(".play").click();
+      await page.locator(".cell.now").first().waitFor({ timeout: 10_000 });
+      await page.locator('.grid-row[data-track="0"] .cell').nth(1).click();
+      expect(await page.title()).toBe("● Undertow · dnbm");
+      expect(problems).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  }, 30_000);
+
+  test("the player lists every example song and plays one", async () => {
+    const { page, problems } = await open("/player/");
+    try {
+      await page.locator(".track").first().waitFor();
+      expect(await page.locator(".bar").isVisible()).toBe(true);
+      expect(await page.locator(".track").count()).toBeGreaterThan(1);
+      await page.locator(".control.play").click();
+      const time = await page.waitForSelector(".time");
+      await page.waitForFunction((element) => element.textContent !== "0:00", time, {
+        timeout: 15_000,
+      });
+      expect(problems).toEqual([]);
+    } finally {
+      await page.close();
+    }
   }, 30_000);
 });

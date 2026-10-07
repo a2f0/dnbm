@@ -12,11 +12,23 @@ export class Spectrum {
   private bins: Uint8Array<ArrayBuffer> = new Uint8Array(0);
   private readonly levels = new Float32Array(BARS);
   private readonly peaks = new Float32Array(BARS);
+  private frame: number | undefined;
 
-  constructor() {
+  /** Draws until `signal` aborts. */
+  constructor(signal: AbortSignal) {
     this.element = Object.assign(document.createElement("canvas"), { className: "spectrum" });
     this.element.setAttribute("aria-hidden", "true");
-    requestAnimationFrame(() => this.draw());
+    if (signal.aborted) return;
+    this.frame = requestAnimationFrame(() => this.draw());
+    signal.addEventListener(
+      "abort",
+      () => {
+        if (this.frame !== undefined) cancelAnimationFrame(this.frame);
+        this.frame = undefined;
+        this.analyser = undefined;
+      },
+      { once: true },
+    );
   }
 
   attach(analyser: AnalyserNode): void {
@@ -45,7 +57,7 @@ export class Spectrum {
   }
 
   private draw(): void {
-    requestAnimationFrame(() => this.draw());
+    this.frame = requestAnimationFrame(() => this.draw());
     const { element, levels, peaks } = this;
     const ratio = window.devicePixelRatio || 1;
     const width = Math.round(element.clientWidth * ratio);

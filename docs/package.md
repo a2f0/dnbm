@@ -1,8 +1,10 @@
 # The `@a2f0/dnbm` package
 
-`@a2f0/dnbm` embeds the complete sequencer in another page or app, such as a
-mini-app window. It is plain ESM with TypeScript declarations; consumers need
-neither Bun nor Rust, and installing it runs no scripts.
+`@a2f0/dnbm` embeds the complete sequencer, or the player, in another page or app,
+such as a mini-app window. The app renders into the host's own document, inside a
+shadow root that keeps its styles and the host's apart. It is plain ESM with
+TypeScript declarations; consumers need neither Bun nor Rust, and installing it runs
+no scripts.
 
 ```sh
 bun add --exact @a2f0/dnbm
@@ -12,10 +14,10 @@ npm install --save-exact @a2f0/dnbm
 
 ## Copy the app's assets
 
-The app is a static site: a page, its scripts, an AudioWorklet, the WebAssembly
-engine and the example songs, and the player at `player/`, which plays songs through
-the same engine. Copy it into a directory your host serves, from a
-Node 22+ or Bun build script:
+The app is a set of static files: its code (`mount.js`, and `player/mount.js` for
+the player), its stylesheets, an AudioWorklet, a WAV export worker, the WebAssembly
+engine and the example songs, along with the site's own pages. Copy them into a
+directory your host serves, from a Node 22+ or Bun build script:
 
 ```ts
 import { copyDnbmAssets } from "@a2f0/dnbm/build";
@@ -23,14 +25,11 @@ import { copyDnbmAssets } from "@a2f0/dnbm/build";
 await copyDnbmAssets("./public/dnbm");
 ```
 
-Serve that directory over HTTP, keeping its relative paths; the app loads
-everything relative to its page, so any path works. The helper adds files and
-clears nothing: give it a dedicated directory, and clear it first to drop files an
-upgrade removed. Keep the copy out of Git.
-
-The page compiles WebAssembly, so a host with a content security policy must allow
-`'wasm-unsafe-eval'` in `script-src`, and `worker-src 'self'` for the AudioWorklet
-and the WAV export worker.
+Serve that directory over HTTP, keeping its relative paths, and pass its URL to the
+mount functions: the app loads everything from there, so any path works. The helper
+adds files and clears nothing: give it a dedicated directory, and clear it first to
+drop files an upgrade removed. Keep the copy out of Git, and copy it again whenever
+you upgrade the package, so the code you bundle and the code you serve match.
 
 ## Mount it
 
@@ -38,33 +37,86 @@ and the WAV export worker.
 import { mountDnbm } from "@a2f0/dnbm";
 
 const dnbm = mountDnbm(container, { assetsUrl: "/dnbm/" });
+await dnbm.ready; // optional: the app shows
 
 // When the component leaves:
 dnbm.destroy();
 ```
 
-The app fills `container` through an iframe, which keeps its styles and scripts apart
-from the host page; give the container an explicit height. Audio
-starts on the first gesture inside the frame, as browsers require. Embedding hides
-the dnbm wordmark, since the host names the app; pass `branding: true` to show it.
-`title` sets the frame's accessible title. Importing the module never touches the
-DOM, so server rendering and lazy loading are safe, and `destroy` releases the
-frame's document and audio context.
+`mountDnbm` returns at once with an instance:
 
-The app autosaves the open song to local storage under `dnbm:song` and
-`dnbm:saved`. Storage belongs to an origin, not a frame: served from the host's own
-origin, as when copied into its static files, every embed on that origin shares one
-autosaved song, and the host's pages can read it. Serve the assets from an origin of
-their own to keep that storage apart.
+- `element` is the `HTMLElement` it appended to `container`: a region named by the
+  `title` option (default "dnbm drum and bass sequencer"), with the app in its open
+  shadow root. It fills the container, which sets the app's size and placement: give
+  the container an explicit height. The app is laid out for about 1200 by 800 pixels;
+  a shorter container scrolls the app, and one 720 pixels wide or less stacks its
+  panels.
+- `ready` resolves once the app shows, styled and laid out: use it where an iframe's
+  `load` event was used, for example to fit a window to the app. It rejects when the
+  app can't start, as when its assets fail to load, and the element then says why;
+  the error is also logged, so a host that ignores `ready` sees no unhandled
+  rejection. A destroyed instance's `ready` never settles, as a removed frame never
+  loads.
+- `destroy()` removes the element and releases everything the app holds: its audio
+  context, worker, listeners, timers and animation frames. Calling it again does
+  nothing, and destroying while the app still loads is safe. Unlike a frame, the app
+  doesn't stop when its element merely leaves the page: always call `destroy`.
 
-In a React component, an effect owns the lifecycle:
+Embedding hides the dnbm wordmark, since the host names the app; pass
+`branding: true` to show it. Importing the module never touches the DOM, so server
+rendering and lazy loading are safe.
+
+Audio starts on the first press inside the app, as browsers require. The app takes
+the keyboard only while focus is inside it, and a press anywhere in it gives it focus:
+keys pressed elsewhere on the host page, or in another app, never reach its
+shortcuts. Presses and keys still bubble out of it to the host, so a host's window
+can raise itself on a press inside the app; a key the app acts on arrives with
+`defaultPrevented` set, so a host's own shortcuts can leave it alone. The app scrolls
+only its own panels, never the host page. Confirmations and prompts open inside the
+app, over the app only, and the rest of the host page stays usable.
+
+In a React component, an effect owns the lifecycle. Mounting is synchronous, so React
+Strict Mode's mount, destroy and mount again in development works:
 
 ```tsx
 useEffect(() => {
   const dnbm = mountDnbm(host.current!, { assetsUrl: "/dnbm/" });
+  dnbm.ready.then(fit, fit); // fit the window to the app, whether or not it started
   return () => dnbm.destroy();
 }, []);
 ```
+
+### How the app's code loads
+
+The package's module (`lib/`) is a small loader that a host bundles. When it mounts,
+it imports the app's code from the assets (`mount.js`) with a dynamic `import()` that
+carries `webpackIgnore`, `turbopackIgnore` and `@vite-ignore` comments, so webpack
+(including Next.js with `--webpack`), Turbopack and Vite leave it to the browser;
+Rollup, esbuild and Bun leave an import of a variable alone anyway. A bundler that
+tried to resolve it would fail to build: tell it to ignore that import. The host's
+bundle stays small, and the app's code loads only when an app mounts, once per page.
+
+### Storage
+
+The sequencer autosaves the open song to the host page's local storage under
+`dnbm:song` and `dnbm:saved`, the keys earlier versions used, so a song autosaved by
+an earlier version on the same origin still opens. Every embed on that origin shares
+one autosaved song, and the host's pages can read it. The player stores nothing.
+
+### Content security policy and other origins
+
+The app runs in the host's page, under the host's content security policy. A host
+with one must allow the assets' origin (usually `'self'`) in `script-src`,
+`style-src`, `worker-src` and `connect-src`, and `'wasm-unsafe-eval'` in `script-src`,
+since the AudioWorklet compiles WebAssembly.
+
+Serve the assets from the host's origin when you can. Assets on another origin work
+when that origin allows the page's origin through CORS (`Access-Control-Allow-Origin`)
+on every file, since the page imports the code and fetches the engine and songs
+itself; browsers start workers only from the page's origin, so the WAV export then
+starts its worker through a `blob:` URL, which `worker-src` must allow. The app's code
+runs with the host page's privileges wherever it is served from: serve it only from
+an origin you trust.
 
 ## Mount the player
 
@@ -84,16 +136,35 @@ player.destroy();
 ```
 
 `songs` lists song files in playing order; relative URLs resolve against the host
-page. Without it, the player lists every example song the assets hold. The frame
-fetches the songs itself, so a song on another origin must allow the assets' origin
-through CORS. `assetsUrl`, `title` and `branding` work as for `mountDnbm`, and the
-returned instance is the same. Embedded, the player fills its container and its
-playlist takes whatever height the rest leaves, so any size around 440 by 420 pixels
-or more suits it; it stores nothing.
+page. Without it, the player lists every example song the assets hold. The page
+fetches the songs, so a song on another origin must allow the page's origin through
+CORS. `assetsUrl`, `title` (default "dnbm player") and `branding` work as for
+`mountDnbm`, and the returned instance is the same; its `ready` resolves once the
+songs have loaded and the player shows. Embedded, the player fills its container and
+its playlist takes whatever height the rest leaves, so any size around 440 by 420
+pixels or more suits it.
+
+The sequencer and the player can run side by side on one page, each with its own
+audio context, and as many instances of each as a host likes.
 
 Asset files are also reachable as `@a2f0/dnbm/assets/<path>` for tooling that
 resolves package files directly. Songs saved from an embedded app are ordinary
 song files; [the song format](song-format.md) describes them.
+
+## From 0.2 (iframes) to 0.3
+
+Before 0.3, the app ran in an iframe. Hosts upgrading:
+
+- `element` is the app's region element, not an `HTMLIFrameElement`: wait for `ready`
+  instead of the frame's `load` event, and reach the app through
+  `element.shadowRoot` instead of `contentDocument`. Embedded, the app's `.frame`
+  element carries `data-embed`, which the frame's document element used to.
+- The app's styles no longer reach outside its shadow root, and the host's no longer
+  reach in; nothing inherited from the host's elements does either.
+- Presses inside the app reach the host's window as any other press does, so a
+  workaround that raised a window when a frame took focus is no longer needed.
+- Copy the assets again: the app's code is new files (`mount.js`,
+  `player/mount.js`).
 
 ## Releases
 

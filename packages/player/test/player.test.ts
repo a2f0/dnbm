@@ -53,6 +53,14 @@ async function state(page: Page): Promise<string | null> {
   return page.locator(".player").getAttribute("data-state");
 }
 
+/** Waits until the display's clock leaves 0:00. */
+async function untilPlaying(page: Page): Promise<void> {
+  const time = await page.waitForSelector(".time");
+  await page.waitForFunction((element) => element.textContent !== "0:00", time, {
+    timeout: 15_000,
+  });
+}
+
 describe("player", () => {
   test("lists every example song and plays one", async () => {
     const page = await browser.newPage({ viewport: { width: 800, height: 700 } });
@@ -65,9 +73,7 @@ describe("player", () => {
       expect(await page.locator(".time").textContent()).toBe("0:00");
 
       await page.locator(".track").nth(1).click();
-      await page.waitForFunction(() => document.querySelector(".time")?.textContent !== "0:00", {
-        timeout: 15_000,
-      });
+      await untilPlaying(page);
       expect(await page.locator(".player").getAttribute("data-state")).toBe("playing");
       expect(await page.locator(".track").nth(1).getAttribute("aria-current")).toBe("true");
 
@@ -91,9 +97,15 @@ describe("player", () => {
     try {
       await page.goto(new URL("/player/", server.url).href);
       await page.waitForSelector(".track");
-      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
-        false,
-      );
+      expect(
+        await page.evaluate(() => {
+          const frame = document.querySelector("#app > div")?.shadowRoot?.querySelector(".frame");
+          return (
+            document.documentElement.scrollWidth > innerWidth ||
+            (frame?.scrollWidth ?? 0) > (frame?.clientWidth ?? 0)
+          );
+        }),
+      ).toBe(false);
     } finally {
       await page.close();
     }
@@ -143,9 +155,7 @@ describe("player", () => {
       expect(await page.locator(".time").textContent()).toBe("0:00");
 
       await page.keyboard.press("x");
-      await page.waitForFunction(() => document.querySelector(".time")?.textContent !== "0:00", {
-        timeout: 15_000,
-      });
+      await untilPlaying(page);
       expect(await state(page)).toBe("playing");
     } finally {
       await page.close();

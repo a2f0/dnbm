@@ -12,10 +12,17 @@ import { Spectrum } from "./spectrum";
 import { clock, slotAt, stepAt, type Timeline, timeline } from "./timeline";
 
 export interface PlayerOptions {
-  /** The engine module, relative to the page. */
-  readonly wasmUrl?: string;
-  /** The AudioWorklet script, relative to the page. */
-  readonly workletUrl?: string;
+  /** The engine module. */
+  readonly wasmUrl: string | URL;
+  /** The AudioWorklet script. */
+  readonly workletUrl: string | URL;
+  /**
+   * Where the player's keys arrive: the element that takes focus on a press anywhere in
+   * the player, so its shortcuts act on its own keys and on no others.
+   */
+  readonly keyboard: HTMLElement;
+  /** Aborts when the player goes: it then closes its audio and stops its timers. */
+  readonly signal: AbortSignal;
 }
 
 type State = "stopped" | "playing" | "paused";
@@ -75,13 +82,22 @@ export class Player {
   private readonly volume: HTMLInputElement;
   private readonly buttons: Record<keyof typeof ICONS, HTMLButtonElement>;
   private readonly rows: HTMLButtonElement[];
-  private readonly spectrum = new Spectrum();
+  private readonly spectrum: Spectrum;
 
   constructor(
     root: HTMLElement,
     private readonly songs: readonly Song[],
-    private readonly options: PlayerOptions = {},
+    private readonly options: PlayerOptions,
   ) {
+    this.spectrum = new Spectrum(options.signal);
+    options.signal.addEventListener(
+      "abort",
+      () => {
+        this.clearTail();
+        this.host = undefined;
+      },
+      { once: true },
+    );
     this.timelines = songs.map(timeline);
     this.playlist = new Playlist(songs.length);
 
@@ -212,7 +228,7 @@ export class Player {
       this.volume.style.setProperty("--fill", `${this.volume.value}%`);
       this.host?.setVolume(this.gain());
     });
-    document.addEventListener("keydown", (event) => this.keydown(event));
+    this.options.keyboard.addEventListener("keydown", (event) => this.keydown(event));
   }
 
   private keydown(event: KeyboardEvent): void {
@@ -243,10 +259,8 @@ export class Player {
 
   /** Starts the engine on the first play, which is a user gesture, as browsers require. */
   private engine(): Promise<EngineHost | undefined> {
-    this.starting ??= EngineHost.start(
-      this.options.wasmUrl ?? "../engine.wasm",
-      this.options.workletUrl ?? "../worklet.js",
-    ).then(
+    const { wasmUrl, workletUrl, signal } = this.options;
+    this.starting ??= EngineHost.start(wasmUrl, workletUrl, signal).then(
       (host) => {
         this.host = host;
         host.setVolume(this.gain());
@@ -256,6 +270,7 @@ export class Player {
         return host;
       },
       (error: unknown) => {
+        if (signal.aborted) return undefined;
         this.starting = undefined;
         this.fail(error instanceof Error ? error.message : String(error));
         return undefined;
@@ -283,6 +298,8 @@ export class Player {
     this.state = "playing";
     this.render();
     const host = await this.engine();
+    // The player may have gone while the engine was awaited.
+    if (this.options.signal.aborted) return;
     if (!host) {
       this.state = "stopped";
       this.render();
@@ -410,7 +427,7 @@ export class Player {
   /** Lets what is left of the tail ring out, then moves on to the next song. */
   private waitForTail(): void {
     const tail = this.tail;
-    if (!tail || tail.timer !== undefined) return;
+    if (!tail || tail.timer !== undefined || this.options.signal.aborted) return;
     tail.since = performance.now();
     tail.timer = setTimeout(
       () => {

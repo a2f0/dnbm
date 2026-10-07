@@ -27,7 +27,7 @@ import {
 } from "@a2f0/dnbm-synth/song/notation";
 import type { App } from "../app";
 import type { View } from "../view";
-import { h, setClass, setText } from "./dom";
+import { h, reveal, setClass, setText } from "./dom";
 
 /** Tracker-style note keys: the bottom row is one octave, the top row the next. */
 const PIANO_KEYS: Readonly<Record<string, number>> = {
@@ -98,6 +98,7 @@ export class Grid {
   readonly element: HTMLElement;
   private readonly body: HTMLElement;
   private readonly ruler: HTMLElement;
+  private readonly scroller: HTMLElement;
   private rows: Row[] = [];
   private structure = "";
   private paint: Paint | undefined;
@@ -123,8 +124,9 @@ export class Grid {
       add.value = "";
       if (kind) this.addTrack(kind);
     });
+    this.scroller = h("div", { class: "grid-scroll" }, [this.ruler, this.body]);
     this.element = h("section", { class: "grid-panel" }, [
-      h("div", { class: "grid-scroll" }, [this.ruler, this.body]),
+      this.scroller,
       h("div", { class: "grid-footer" }, [add]),
     ]);
     this.listen();
@@ -290,7 +292,9 @@ export class Grid {
   }
 
   private cellAt(x: number, y: number): { track: number; step: number } | undefined {
-    const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>(".cell");
+    // The app renders in a shadow root, where the document would only see its host.
+    const root = this.body.getRootNode() as Document | ShadowRoot;
+    const cell = root.elementFromPoint(x, y)?.closest<HTMLElement>(".cell");
     const row = cell?.closest<HTMLElement>(".grid-row");
     if (!cell || !row) return undefined;
     return { track: Number(row.dataset["track"]), step: Number(cell.dataset["step"]) };
@@ -411,7 +415,10 @@ export class Grid {
     this.body.addEventListener("pointerup", () => this.endPaint());
     this.body.addEventListener("pointercancel", () => this.endPaint());
     this.body.addEventListener("lostpointercapture", () => this.endPaint());
-    window.addEventListener("blur", () => this.endPaint());
+    // Losing the window mid-drag ends the paint, for as long as the app lives.
+    window.addEventListener("blur", () => this.endPaint(), {
+      signal: this.app.environment.signal,
+    });
     this.body.addEventListener("contextmenu", (event) => {
       const cell = (event.target as HTMLElement).closest<HTMLElement>(".cell");
       const row = cell?.closest<HTMLElement>(".grid-row");
@@ -432,10 +439,9 @@ export class Grid {
       cursor: next,
       trackId: this.app.song.tracks[next.track]?.id ?? this.app.view.trackId,
     });
-    this.rows[next.track]?.cells[next.step]?.scrollIntoView({
-      block: "nearest",
-      inline: "nearest",
-    });
+    const cell = this.rows[next.track]?.cells[next.step];
+    // The grid scrolls, then the app's frame when the app is taller than it.
+    if (cell) reveal(cell, this.scroller, this.app.environment.frame);
   }
 
   /**

@@ -117,7 +117,7 @@ export class Transport {
       this.examples.value = "";
       if (file) void app.openExample(file);
     });
-    void this.loadExamples();
+    void this.loadExamples(app);
 
     this.element = h("header", { class: "topbar" }, [
       h("div", { class: "brand", text: "dnbm" }),
@@ -149,21 +149,23 @@ export class Transport {
     ]);
   }
 
-  private async loadExamples(): Promise<void> {
+  private async loadExamples(app: App): Promise<void> {
     try {
-      const response = await fetch("songs/index.json");
+      const response = await fetch(app.asset("songs/index.json"), {
+        signal: app.environment.signal,
+      });
       if (!response.ok) return;
       const songs: { file: string; title: string }[] = await response.json();
       for (const song of songs)
         this.examples.append(h("option", { value: song.file, text: song.title }));
     } catch {
-      // Examples are optional, as when the page is opened without the server.
+      // Examples are optional, as when the assets are served without them.
     }
   }
 
   update(song: Song, view: View, store: SongStore): void {
-    if (document.activeElement !== this.title) this.title.value = song.title;
-    if (document.activeElement !== this.bpm) this.bpm.value = String(song.bpm);
+    if (!this.title.matches(":focus")) this.title.value = song.title;
+    if (!this.bpm.matches(":focus")) this.bpm.value = String(song.bpm);
     this.swing.set(song.swing);
     this.playButton.replaceChildren(icon(view.playing ? STOP : PLAY));
     this.playButton.setAttribute("aria-label", view.playing ? "Stop" : "Play");

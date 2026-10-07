@@ -11,11 +11,14 @@
     />
     <title>dnbm player</title>
     <link rel="icon" href="../icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="../page.css" />
+    <!-- main.js mounts the player from mount.js and styles.css; fetch them alongside it. -->
+    <link rel="modulepreload" href="mount.js" />
+    <link rel="preload" href="styles.css" as="style" />
     <script type="module" src="main.js"></script>
   </head>
   <body>
-    <main id="app" class="app"></main>
-    <noscript><p class="failure">The dnbm player needs JavaScript and WebAssembly.</p></noscript>
+    <main id="app" class="page"></main>
+    <noscript><p class="noscript">The dnbm player needs JavaScript and WebAssembly.</p></noscript>
   </body>
 </html>

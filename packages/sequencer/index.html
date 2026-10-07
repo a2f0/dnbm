@@ -11,11 +11,14 @@
     />
     <title>dnbm</title>
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="page.css" />
+    <!-- main.js mounts the app from mount.js and styles.css; fetch them alongside it. -->
+    <link rel="modulepreload" href="mount.js" />
+    <link rel="preload" href="styles.css" as="style" />
     <script type="module" src="main.js"></script>
   </head>
   <body>
-    <div id="app" class="app"></div>
+    <main id="app" class="page"></main>
     <noscript><p class="noscript">dnbm needs JavaScript and WebAssembly.</p></noscript>
   </body>
 </html>

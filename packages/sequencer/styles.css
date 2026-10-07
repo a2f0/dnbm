@@ -1,8 +1,15 @@
 /* dnbm is drawn in greys: every colour has equal red, green and blue
    (test/grayscale.test.ts refuses any other). Brightness carries meaning:
-   brighter is louder, selected, or playing. */
-:root {
-  color-scheme: dark;
+   brighter is louder, selected, or playing.
+
+   These styles apply inside the app's shadow root (src/shell.ts), and only there. The
+   shell gives the host element `all: initial`, so no property the host page sets
+   reaches the app. Custom properties outlast `all`, so the palette is defined on the
+   root's top-level elements (.frame, .dialog-layer, .failure), below the host
+   element, where they also set the app's type and colours. */
+.frame,
+.dialog-layer,
+.failure {
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --bg: #0a0a0a;
   --panel: #0f0f0f;
@@ -32,18 +39,27 @@
   box-sizing: border-box;
 }
 
-html,
-body {
-  height: 100%;
-  margin: 0;
-  background: var(--bg);
+.frame,
+.dialog-layer,
+.failure {
+  color-scheme: dark;
   color: var(--text);
   font: 12px / 1.4 var(--mono);
   -webkit-font-smoothing: antialiased;
 }
 
-body {
+/* The app's viewport: it scrolls a layout taller than the host's container, and its
+   size answers the layout's container queries, as a frame's window once did. */
+.frame {
+  container: dnbm / size;
+  height: 100%;
+  overflow: auto;
+  background: var(--bg);
   scrollbar-color: var(--line-strong) transparent;
+}
+
+.frame:focus {
+  outline: none;
 }
 
 .visually-hidden {
@@ -55,8 +71,11 @@ body {
   white-space: nowrap;
 }
 
-.noscript {
+.failure {
+  height: 100%;
+  margin: 0;
   padding: 24px;
+  background: var(--bg);
   color: var(--muted);
 }
 
@@ -113,7 +132,7 @@ input {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(180px, 1fr) auto auto;
-  height: 100dvh;
+  height: 100%;
 }
 
 .topbar {
@@ -769,18 +788,31 @@ input {
   background: var(--bright);
 }
 
-/* In-app confirmations and prompts (src/ui/dialog.ts). */
+/* In-app confirmations and prompts (src/ui/dialog.ts), over the app and not beyond it. */
+.dialog-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  padding: 16px;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.dialog-layer:focus {
+  outline: none;
+}
+
 .dialog {
-  min-width: min(360px, calc(100vw - 32px));
+  position: static;
+  min-width: min(360px, 100%);
+  max-width: 100%;
+  margin: 0;
   padding: 16px;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   background: var(--panel);
   color: var(--text);
-}
-
-.dialog::backdrop {
-  background: rgba(0, 0, 0, 0.6);
 }
 
 .dialog-message {
@@ -829,19 +861,20 @@ input {
   text-overflow: ellipsis;
 }
 
-/* A short frame, such as a small window, keeps the desktop arrangement and scrolls,
-   rather than squeezing the grid. */
-@media (max-height: 760px) {
+/* A short container, such as a small window, keeps the desktop arrangement and
+   scrolls, rather than squeezing the grid. */
+@container dnbm (max-height: 760px) {
   .app {
     grid-template-rows: auto;
     height: auto;
-    min-height: 100dvh;
+    min-height: 100%;
   }
 }
 
-/* Narrow screens stack the panels. */
-@media (max-width: 720px) {
+/* Narrow containers stack the panels. */
+@container dnbm (max-width: 720px) {
   .app {
+    --head: 116px;
     grid-template-rows: auto;
     height: auto;
   }
@@ -876,10 +909,6 @@ input {
   .tabs,
   .chips {
     flex-basis: calc(100% - 9ch);
-  }
-
-  :root {
-    --head: 116px;
   }
 
   .track-kind {

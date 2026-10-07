@@ -12,7 +12,6 @@ import { convertRow } from "@a2f0/dnbm-synth/song/notation";
 import type { App } from "../app";
 import type { View } from "../view";
 import { ParamControl } from "./control";
-import { confirmDialog } from "./dialog";
 import { h, setText } from "./dom";
 
 export class DevicePanel {
@@ -88,7 +87,7 @@ export class DevicePanel {
     const track = song.tracks.find((candidate) => candidate.id === view.trackId);
     this.element.hidden = !track;
     if (!track) return;
-    if (document.activeElement !== this.name) this.name.value = track.id;
+    if (!this.name.matches(":focus")) this.name.value = track.id;
     this.instrument.value = track.instrument;
     this.choke.value = String(track.choke);
     const spec = INSTRUMENTS[track.instrument];
@@ -180,7 +179,12 @@ export class DevicePanel {
 
   private async remove(): Promise<void> {
     const id = this.app.view.trackId;
-    if (!(await confirmDialog(`Delete track "${id}" and its steps in every pattern?`, "delete")))
+    if (
+      !(await this.app.dialogs.confirm(
+        `Delete track "${id}" and its steps in every pattern?`,
+        "delete",
+      ))
+    )
       return;
     this.app.edit((song) => {
       song.tracks = song.tracks.filter((track) => track.id !== id);
