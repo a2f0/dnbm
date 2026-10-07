@@ -26,7 +26,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up ShellCheck
+      - name: Set up Node and ShellCheck
         uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
           version: 2026.10.3
@@ -105,7 +105,7 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install
 
-      - name: Set up wasm-opt
+      - name: Set up Node and wasm-opt
         uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
           version: 2026.10.3
@@ -170,7 +170,7 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install
 
-      - name: Set up wasm-opt
+      - name: Set up Node and wasm-opt
         uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
           version: 2026.10.3
