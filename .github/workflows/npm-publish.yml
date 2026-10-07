@@ -43,7 +43,7 @@ jobs:
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
           version: 2026.10.3
-          install_args: shellcheck aqua:WebAssembly/binaryen
+          install_args: node shellcheck aqua:WebAssembly/binaryen
           cache: true
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2.2.0
         with:
@@ -69,18 +69,17 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2.2.0
         with:
           bun-version: 1.4.2
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
+        with:
+          version: 2026.10.3
+          install_args: node aqua:WebAssembly/binaryen
+          cache: true
       # Publish only a version newer than npm's latest, so re-runs and out-of-order
       # runs succeed without publishing.
       - id: decide
         run: bun scripts/npmPublishDecision.ts
       - if: steps.decide.outputs.publish == 'true'
         run: rustup toolchain install
-      - if: steps.decide.outputs.publish == 'true'
-        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
-        with:
-          version: 2026.10.3
-          install_args: aqua:WebAssembly/binaryen
-          cache: true
       - if: steps.decide.outputs.publish == 'true'
         run: bun install --frozen-lockfile
       - if: steps.decide.outputs.publish == 'true'
@@ -89,7 +88,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/package"
           npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/package"
       - if: steps.decide.outputs.publish == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: npm-package
           path: ${{ runner.temp }}/package/*.tgz
@@ -110,15 +109,15 @@ jobs:
     steps:
       # Only the packed tarball, verified against its upload digest: nothing from the
       # repository is checked out, installed or run here.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           name: npm-package
           path: package
-      # Trusted publishing needs npm 11.5.1 or later; Node 24.21.0 ships 11.19.0. No
+      # Trusted publishing needs npm 11.5.1 or later; Node 26.10.0 ships 11.19.1. No
       # registry-url: its .npmrc would point npm at an empty NODE_AUTH_TOKEN.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
-          node-version: 24.21.0
+          node-version: 26.10.0
           package-manager-cache: false
       # The ./ matters: npm reads a bare `package/<file>.tgz` as a GitHub owner/repo
       # shorthand and tries to clone it.

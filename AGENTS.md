@@ -41,6 +41,7 @@ policy, so checks need Chrome installed, as GitHub's runners have. While iterati
 bun run engine:check                 # rustfmt, clippy -D warnings, cargo test
 bun run test                         # build the engine, then bun test
 bun run typecheck && bunx biome ci   # TypeScript and Biome
+bun audit                            # package security advisories
 bun run songs:check                  # songs are valid and canonical
 bun run lint:binary-files            # no binary files since upstream (or pass --staged, --all)
 bun run build:package                # the npm package, into lib/ and site/
@@ -84,6 +85,21 @@ song with the same engine, for checking sound changes offline.
 - Code both apps need belongs in `packages/synth`; the apps never import each other.
 - `tsconfig.json` extends `@tsconfig/strictest`; index-signature access uses brackets
   (`record["key"]`), so Biome's `useLiteralKeys` is off.
+
+## Dependency updates
+
+Use the installed `update-dependencies` skill. Run `bun audit` against the baseline
+and final lockfiles; CI also audits dependencies in the lint job. Audits use the
+live advisory database and run separately from `bun run check` and the package
+release checks. The native tooling smoke test checks API compatibility separately.
+
+The exact Miniflare `sharp` override selects 0.35.5, whose prebuilt libvips includes
+librsvg 2.63.2 and fixes
+[GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
+The pinned Wrangler's Miniflare still requests sharp 0.35.4. This patch keeps the
+same Node requirement and image API; it affects development tooling. Remove the
+override once Wrangler's Miniflare includes the fix, then run `bun audit` and
+`bun run check` again.
 
 ## Shipping
 

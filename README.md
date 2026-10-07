@@ -13,7 +13,7 @@ the browser, in an export and from the command line.
 ## Run it
 
 ```sh
-mise install                      # Bun, ShellCheck and wasm-opt (see .mise.toml)
+mise install                      # Bun, Node, ShellCheck and wasm-opt (see .mise.toml)
 bun install
 sh scripts/git/install-hooks.sh   # once per clone
 bun run dev                       # http://localhost:8174

@@ -38,7 +38,7 @@ cargo test --quiet --manifest-path packages/synth/engine/Cargo.toml
 step "Building the site (engine, wasm-opt, bundles)"
 bun scripts/build.ts >/dev/null
 
-step "Testing (song format, store, engine through WebAssembly, grayscale)"
+step "Testing (songs, store, WebAssembly, grayscale, package and tooling)"
 bun test
 
 step "Checking the deploy config"
