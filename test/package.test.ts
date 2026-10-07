@@ -1120,12 +1120,16 @@ describe("the packaged app mounted in a host page", () => {
         () => "resolved",
         (error: unknown) => `rejected: ${error instanceof Error ? error.name : error}`,
       );
-      const message = app.element.shadowRoot?.querySelector(".failure")?.textContent;
+      const failure = app.element.shadowRoot?.querySelector(".failure");
+      const message = failure?.textContent;
+      // Readable without the stylesheet that failed to load.
+      const colour = failure && getComputedStyle(failure).color;
       app.destroy();
-      return { outcome, message };
+      return { outcome, message, colour };
     });
     expect(result.outcome).toStartWith("rejected");
     expect(result.message).toStartWith("dnbm couldn't start:");
+    expect(result.colour).toBe("rgb(138, 138, 138)");
     expect(errors).toEqual([]);
   }, 20_000);
 });

@@ -119,11 +119,16 @@ function loaded(link: HTMLLinkElement): Promise<void> {
 const HOST_STYLE =
   "all:initial;direction:ltr;display:block;position:relative;isolation:isolate;width:100%;height:100%;overflow:hidden";
 
+// The failure message's own look, since the app's stylesheet may be what failed.
+const FAILURE_STYLE =
+  "box-sizing:border-box;height:100%;margin:0;padding:24px;background:#0a0a0a;color:#8a8a8a;font:12px/1.4 ui-monospace,monospace";
+
 /** Shows why the app couldn't start, in place of the app. */
 function showFailure(root: ShadowRoot, error: unknown): void {
   const document = root.ownerDocument;
   const message = document.createElement("p");
   message.className = "failure";
+  message.style.cssText = FAILURE_STYLE;
   message.setAttribute("role", "alert");
   message.textContent = `dnbm couldn't start: ${error instanceof Error ? error.message : String(error)}`;
   root.replaceChildren(...[...root.querySelectorAll("link")].filter((link) => link.sheet), message);
