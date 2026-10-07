@@ -397,7 +397,8 @@ export class Grid {
       }
       const cell = target.closest<HTMLElement>(".cell");
       if (!cell) return;
-      event.preventDefault();
+      // The press goes on as any other does, so the host sees its mousedown (a host's
+      // open menu closes); the grid's styles keep a drag from selecting text.
       this.body.focus({ preventScroll: true });
       this.body.setPointerCapture(event.pointerId);
       this.startPaint(event, track, Number(cell.dataset["step"]));

@@ -3,10 +3,27 @@
 // it never touches the DOM, so server rendering and lazy loading are safe.
 // docs/package.md describes the package.
 
-// The emitted module keeps this path, so it names the file browsers and Node load.
-import { type DnbmInstance, mountApp, PLAYER, SEQUENCER } from "./shell.js";
+// The emitted modules keep these paths, so they name the files browsers and Node load.
+import {
+  type DnbmPlayerInstance,
+  type DnbmSequencerInstance,
+  mountApp,
+  PLAYER,
+  SEQUENCER,
+} from "./shell.js";
 
-export type { DnbmInstance } from "./shell.js";
+export type {
+  DnbmPlayerCommand,
+  DnbmPlayerState,
+  DnbmSequencerCommand,
+  DnbmSequencerState,
+} from "./control.js";
+export type {
+  DnbmControls,
+  DnbmInstance,
+  DnbmPlayerInstance,
+  DnbmSequencerInstance,
+} from "./shell.js";
 
 export interface DnbmOptions {
   /**
@@ -22,6 +39,14 @@ export interface DnbmOptions {
    * window or page already names the app.
    */
   readonly branding?: boolean;
+  /**
+   * Show the app's own buttons for the commands its instance's `run` takes: in the
+   * sequencer's top bar, play, new, open, save, export, undo and redo; in the player,
+   * previous, play, pause, stop, next, shuffle and repeat. True by default. Pass false
+   * when the host shows those commands itself, as in its window's menus and toolbar, so
+   * they don't show twice; the rest of the app, and its keyboard shortcuts, stay.
+   */
+  readonly actions?: boolean;
 }
 
 export interface DnbmPlayerOptions extends DnbmOptions {
@@ -37,31 +62,41 @@ export interface DnbmPlayerOptions extends DnbmOptions {
  * Mounts the dnbm sequencer filling `container`, inside a shadow root. It returns at
  * once; `ready` settles when the app shows. The container sets the app's size and
  * placement: give it an explicit height. Call `destroy` when the hosting component
- * leaves.
+ * leaves. The instance's `run`, `state` and `subscribe` let a host drive the app from
+ * its own controls.
  */
 export function mountDnbm(
   container: HTMLElement,
-  { assetsUrl, title = SEQUENCER.label, branding = false }: DnbmOptions,
-): DnbmInstance {
-  return mountApp(container, { ...SEQUENCER, assetsUrl, label: title, embed: !branding });
+  { assetsUrl, title = SEQUENCER.label, branding = false, actions = true }: DnbmOptions,
+): DnbmSequencerInstance {
+  return mountApp(container, {
+    ...SEQUENCER,
+    assetsUrl,
+    label: title,
+    embed: !branding,
+    actions: actions !== false,
+  });
 }
 
 /**
  * Mounts the dnbm player, which plays a playlist of songs and edits nothing, filling
  * `container`, from the same assets as `mountDnbm`. It returns at once; `ready`
  * settles when the player shows, with its songs loaded. The container sets its size:
- * give it an explicit height. Call `destroy` when the hosting component leaves.
+ * give it an explicit height. Call `destroy` when the hosting component leaves. The
+ * instance's `run`, `state` and `subscribe` let a host drive the player from its own
+ * controls.
  */
 export function mountDnbmPlayer(
   container: HTMLElement,
-  { assetsUrl, title = PLAYER.label, branding = false, songs }: DnbmPlayerOptions,
-): DnbmInstance {
+  { assetsUrl, title = PLAYER.label, branding = false, actions = true, songs }: DnbmPlayerOptions,
+): DnbmPlayerInstance {
   const page = container.ownerDocument.baseURI;
   return mountApp(container, {
     ...PLAYER,
     assetsUrl,
     label: title,
     embed: !branding,
+    actions: actions !== false,
     songs: songs?.map((song) => new URL(song, page).href),
   });
 }

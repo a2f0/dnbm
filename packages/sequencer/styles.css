@@ -249,13 +249,14 @@ input {
   margin-left: auto;
 }
 
-/* Knobs and faders. */
+/* Knobs and faders. A drag turns them, and neither scrolls nor selects text. */
 .control {
   /* Contains the fader's visually hidden label, which would otherwise escape the
      mixer's scroller and widen the page. */
   position: relative;
   cursor: ns-resize;
   touch-action: none;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -481,8 +482,11 @@ input {
   color: var(--bright);
 }
 
+/* Dragging across the steps paints them, and selects no text. */
 .grid {
   width: max-content;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .grid:focus-visible {

@@ -9,7 +9,12 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { type Browser, chromium, type Locator, type Page } from "playwright-core";
 import { buildPackage } from "../scripts/buildPackage";
-import type { DnbmInstance } from "../src/index";
+import type {
+  DnbmOptions,
+  DnbmPlayerInstance,
+  DnbmPlayerOptions,
+  DnbmSequencerInstance,
+} from "../src/index";
 
 const ROOT = join(import.meta.dir, "..");
 
@@ -87,6 +92,8 @@ describe("the published package", () => {
       "lib/index.d.ts",
       "lib/shell.js",
       "lib/shell.d.ts",
+      "lib/control.js",
+      "lib/control.d.ts",
       "lib/build.js",
       "lib/build.d.ts",
       "site/index.html",
@@ -130,9 +137,16 @@ describe("the published package", () => {
       `import {
   mountDnbm,
   mountDnbmPlayer,
+  type DnbmControls,
   type DnbmInstance,
   type DnbmOptions,
+  type DnbmPlayerCommand,
+  type DnbmPlayerInstance,
   type DnbmPlayerOptions,
+  type DnbmPlayerState,
+  type DnbmSequencerCommand,
+  type DnbmSequencerInstance,
+  type DnbmSequencerState,
 } from "@a2f0/dnbm";
 import { copyDnbmAssets } from "@a2f0/dnbm/build";
 
@@ -150,6 +164,39 @@ export function mountPlayer(container: HTMLElement): DnbmInstance {
     songs: ["/dnbm/songs/undertow.dnbm.json", new URL("https://example.com/a.dnbm.json")],
   };
   return mountDnbmPlayer(container, options);
+}
+// A host's chrome, built from the instances' commands and state alone.
+export function chrome(container: HTMLElement): () => void {
+  const sequencer: DnbmSequencerInstance = mountDnbm(container, {
+    assetsUrl: "/dnbm/",
+    actions: false,
+  });
+  const player: DnbmPlayerInstance = mountDnbmPlayer(container, {
+    assetsUrl: "/dnbm/",
+    actions: false,
+  });
+  const controls: DnbmControls<DnbmSequencerCommand, DnbmSequencerState> = sequencer;
+  const save: DnbmSequencerCommand = "saveAs";
+  const ran: boolean = controls.run(save);
+  const state: DnbmSequencerState = sequencer.state;
+  const label = \`\${state.dirty ? "● " : ""}\${state.title} (\${state.fileName}) \${ran}\`;
+  const canSave: boolean = state.available.save && !state.playing;
+  const next: DnbmPlayerCommand = "next";
+  player.run(next);
+  // @ts-expect-error The player has no save.
+  player.run("save");
+  // @ts-expect-error The sequencer has no next.
+  sequencer.run("next");
+  const subscribe = player.subscribe;
+  const unsubscribe: () => void = subscribe((now: DnbmPlayerState) => {
+    void [now.playing, now.paused, now.title, now.shuffle, now.repeat, now.available.togglePlay];
+  });
+  void [label, canSave];
+  return () => {
+    unsubscribe();
+    sequencer.destroy();
+    player.destroy();
+  };
 }
 const copy: (destination: string | URL) => Promise<void> = copyDnbmAssets;
 console.log(
@@ -316,10 +363,16 @@ function serve(
 interface HostWindow {
   dnbm: typeof import("../src/index");
   // Not "player": the window already names the element with that id.
-  sequencerApp: DnbmInstance | undefined;
-  playerApp: DnbmInstance | undefined;
-  mountSequencer(): Promise<void>;
-  mountPlayer(): Promise<void>;
+  sequencerApp: DnbmSequencerInstance | undefined;
+  playerApp: DnbmPlayerInstance | undefined;
+  mountSequencer(options?: Partial<DnbmOptions>): Promise<void>;
+  mountPlayer(options?: Partial<DnbmPlayerOptions>): Promise<void>;
+  /** What the host's own button (#host-play) does when pressed. */
+  hostAction: (() => unknown) | undefined;
+  /** Where the host's document-level `mousedown` listener heard each press: an id. */
+  mousedowns: string[];
+  /** What the last command the host's button ran returned. */
+  ran: boolean | undefined;
   contexts: AudioContext[];
   /** Calls to resume an audio context that was already closed. */
   resumedClosed: number;
@@ -350,19 +403,30 @@ const HOST_PAGE = `<!doctype html><meta charset="utf-8"><title>host</title>
 <script type="module">
   import * as dnbm from "/lib/index.js";
   window.dnbm = dnbm;
-  window.mountSequencer = () => {
+  window.mountSequencer = (options = {}) => {
     window.sequencerApp?.destroy();
-    window.sequencerApp = dnbm.mountDnbm(document.getElementById("window"), { assetsUrl: "/dnbm/" });
+    window.sequencerApp = dnbm.mountDnbm(document.getElementById("window"), {
+      assetsUrl: "/dnbm/",
+      ...options,
+    });
     return window.sequencerApp.ready;
   };
-  window.mountPlayer = () => {
+  window.mountPlayer = (options = {}) => {
     window.playerApp?.destroy();
     window.playerApp = dnbm.mountDnbmPlayer(document.getElementById("player"), {
       assetsUrl: "/dnbm/",
       songs: ["/dnbm/songs/wraith.dnbm.json", "/dnbm/songs/undertow.dnbm.json"],
+      ...options,
     });
     return window.playerApp.ready;
   };
+  // The host's own control, which a test points at the apps' commands, and its
+  // document-level mousedown listener, as a host's open menus close on.
+  document.getElementById("host-play").addEventListener("click", () => window.hostAction?.());
+  window.mousedowns = [];
+  document.addEventListener("mousedown", (event) => {
+    window.mousedowns.push(event.target instanceof Element ? event.target.closest("[id]")?.id ?? "" : "");
+  });
 </script>`;
 
 /**
@@ -1269,6 +1333,555 @@ describe("the packaged app mounted in a host page", () => {
     expect(result.colour).toBe("rgb(138, 138, 138)");
     expect(errors).toEqual([]);
   }, 20_000);
+});
+
+// The packaged apps driven by a host's own controls, as a2f0.net's window menus, toolbar
+// and status bar drive them: through each instance's commands and state, never its
+// shadow root.
+describe("the packaged app driven by its host's controls", () => {
+  let browser: Browser;
+  let page: Page;
+  let server: ReturnType<typeof serve>;
+  let sequencer: Locator;
+  let player: Locator;
+  const errors: string[] = [];
+
+  beforeAll(async () => {
+    const host = join(temporary, "host-controls");
+    await copyAssets(join(host, "dnbm"));
+    await writeFile(join(host, "index.html"), HOST_PAGE);
+    server = serve({ "/lib/": join(installed, "lib"), "/": host });
+    browser = await chromium.launch({ channel: "chrome", headless: true });
+    page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1700, height: 900 } });
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.addInitScript(instrument);
+    await page.goto(server.url.href);
+    sequencer = page.locator("#window");
+    player = page.locator("#player");
+  }, 60_000);
+
+  afterAll(async () => {
+    await browser?.close();
+    await server?.stop(true);
+  });
+
+  /**
+   * Presses the host's own button, which runs `command` on an app as a host's menu item
+   * or toolbar button would, with the user's activation, and says what `run` returned.
+   */
+  async function hostRun(
+    command: string,
+    app: "sequencerApp" | "playerApp" = "sequencerApp",
+  ): Promise<boolean | undefined> {
+    await page.evaluate(
+      ([command, app]) => {
+        const host = window as unknown as HostWindow;
+        host.ran = undefined;
+        host.hostAction = () => {
+          host.ran = host[app]?.run(command as never);
+        };
+      },
+      [command, app] as const,
+    );
+    await page.click("#host-play");
+    return page.evaluate(() => (window as unknown as HostWindow).ran);
+  }
+
+  /** An app's state, as the host reads it. */
+  function state(app: "sequencerApp" | "playerApp" = "sequencerApp") {
+    return page.evaluate(
+      (app) => (window as unknown as HostWindow)[app]?.state as unknown as Record<string, unknown>,
+      app,
+    );
+  }
+
+  /** Mounts the sequencer on a song that is just the example's, saved. */
+  async function freshSequencer(options: Partial<DnbmOptions> = {}): Promise<void> {
+    await page.evaluate((options) => {
+      localStorage.clear();
+      return (window as unknown as HostWindow).mountSequencer(options);
+    }, options);
+  }
+
+  /** Drags from the middle of one element to the middle of another, `dy` pixels lower. */
+  async function drag(from: Locator, to: Locator, dy = 0): Promise<void> {
+    const start = await from.boundingBox();
+    const end = await to.boundingBox();
+    if (!start || !end) throw new Error("not visible");
+    await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2 + dy, { steps: 6 });
+    await page.mouse.up();
+  }
+
+  test("presses on steps and knobs reach the host's mousedown listener, and still paint and turn", async () => {
+    await freshSequencer();
+    await page.evaluate(() => {
+      (window as unknown as HostWindow).mousedowns = [];
+    });
+    const steps = sequencer.locator('.grid-row[data-track="0"] .cell');
+    const painted = () =>
+      steps.evaluateAll((cells) => cells.slice(1, 4).map((cell) => cell.classList.contains("hit")));
+    expect(await painted()).toEqual([false, false, false]);
+    await drag(steps.nth(1), steps.nth(3));
+    expect(await painted()).toEqual([true, true, true]);
+    const focus = () =>
+      page.evaluate(() => {
+        const host = window as unknown as HostWindow;
+        const root = host.shadow("window") as ShadowRoot & { getSelection?(): Selection | null };
+        return {
+          // A host's open menu closes on these.
+          mousedowns: host.mousedowns,
+          selected: [document.getSelection()?.toString(), root.getSelection?.()?.toString()],
+          focused: root.activeElement?.getAttribute("aria-label"),
+          scrolled: window.scrollY,
+        };
+      });
+    expect(await focus()).toEqual({
+      mousedowns: ["window"],
+      selected: ["", ""],
+      focused: "Steps. Arrows move; keys enter steps.",
+      scrolled: 0,
+    });
+
+    const knob = sequencer.locator(".device .knob").first();
+    const before = Number(await knob.getAttribute("aria-valuenow"));
+    await drag(knob, knob, -40);
+    expect(Number(await knob.getAttribute("aria-valuenow"))).toBeGreaterThan(before);
+    expect(await focus()).toEqual({
+      mousedowns: ["window", "window"],
+      selected: ["", ""],
+      focused: "Tune",
+      scrolled: 0,
+    });
+    // The grid's keys still reach it after a press.
+    await steps.nth(5).click();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("x");
+    expect(await steps.nth(6).getAttribute("class")).toContain("hit");
+  }, 20_000);
+
+  test("takes no command and reports an idle state before it is ready and once destroyed", async () => {
+    const result = await page.evaluate(async () => {
+      const host = window as unknown as HostWindow;
+      const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+      const ready = host.mountSequencer();
+      const app = host.sequencerApp as DnbmSequencerInstance;
+      const idle = app.state;
+      const early = [app.run("togglePlay"), app.run("new")];
+      const heard: string[] = [];
+      app.subscribe((state) => heard.push(`${state.title} ${state.playing}`));
+      await ready;
+      const atReady = app.state;
+      await tick();
+      const heardAtReady = [...heard];
+      const resumed = host.resumedClosed;
+      // A command, then the host's destroy, before anything it started goes on.
+      const ran = app.run("togglePlay");
+      app.destroy();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return {
+        idle,
+        early,
+        atReady,
+        heardAtReady,
+        ran,
+        heard,
+        after: app.state,
+        late: [app.run("play"), app.run("stop"), app.run("toString" as never)],
+        resumedClosed: host.resumedClosed - resumed,
+        unsubscribe: typeof app.subscribe(() => heard.push("late")),
+      };
+    });
+    const none = {
+      play: false,
+      stop: false,
+      togglePlay: false,
+      new: false,
+      open: false,
+      save: false,
+      saveAs: false,
+      export: false,
+      undo: false,
+      redo: false,
+    };
+    const idle = { playing: false, title: "", fileName: "", dirty: false, available: none };
+    expect(result.idle).toEqual(idle);
+    expect(result.early).toEqual([false, false]);
+    expect(result.atReady).toMatchObject({
+      playing: false,
+      title: "Undertow",
+      fileName: "undertow.dnbm.json",
+      available: { togglePlay: true, play: true, stop: false, save: true },
+    });
+    expect(result.heardAtReady).toEqual(["Undertow false"]);
+    expect(result.ran).toBe(true);
+    // Nothing reaches a subscriber once the instance is destroyed.
+    expect(result.heard).toEqual(["Undertow false"]);
+    expect(result.after).toEqual(idle);
+    expect(result.late).toEqual([false, false, false]);
+    expect(result.resumedClosed).toBe(0);
+    expect(result.unsubscribe).toBe("function");
+    await page.waitForFunction(() =>
+      (window as unknown as HostWindow).contexts.every((context) => context.state === "closed"),
+    );
+    expect(errors).toEqual([]);
+  }, 20_000);
+
+  test("the host's controls play, stop, undo and redo, and the state follows", async () => {
+    await freshSequencer();
+    await page.evaluate(() => {
+      const host = window as unknown as HostWindow & { heard: unknown[] };
+      host.heard = [];
+      host.sequencerApp?.subscribe((state) => host.heard.push(state));
+    });
+    expect(await hostRun("togglePlay")).toBe(true);
+    await sequencer.locator(".cell.now").first().waitFor({ timeout: 10_000 });
+    expect(await state()).toMatchObject({ playing: true, available: { play: false, stop: true } });
+    expect(await sequencer.locator(".play").getAttribute("aria-label")).toBe("Stop");
+    expect(await hostRun("play")).toBe(false);
+    expect(await hostRun("stop")).toBe(true);
+    await page.waitForFunction(
+      () => !(window as unknown as HostWindow).sequencerApp?.state.playing,
+    );
+    expect(await sequencer.locator(".cell.now").count()).toBe(0);
+
+    await sequencer.locator('.grid-row[data-track="0"] .cell').nth(2).click();
+    await page.waitForFunction(() => (window as unknown as HostWindow).sequencerApp?.state.dirty);
+    expect(await state()).toMatchObject({ available: { undo: true, redo: false } });
+    expect(await hostRun("undo")).toBe(true);
+    await page.waitForFunction(() => !(window as unknown as HostWindow).sequencerApp?.state.dirty);
+    expect(await state()).toMatchObject({ available: { undo: false, redo: true } });
+    expect(await hostRun("undo")).toBe(false);
+    expect(await hostRun("redo")).toBe(true);
+    await page.waitForFunction(() => (window as unknown as HostWindow).sequencerApp?.state.dirty);
+
+    const heard = await page.evaluate(() => {
+      const host = window as unknown as HostWindow & { heard: { playing: boolean }[] };
+      return {
+        playing: host.heard.map((state) => state.playing),
+        last: host.heard.at(-1) === host.sequencerApp?.state,
+        frozen: host.heard.every((state) => Object.isFrozen(state)),
+      };
+    });
+    expect(heard.playing).toContain(true);
+    expect(heard.playing.at(-1)).toBe(false);
+    expect(heard.last).toBe(true);
+    expect(heard.frozen).toBe(true);
+    expect(errors).toEqual([]);
+  }, 30_000);
+
+  test("new asks in the app's own dialog, and no command is available while it asks", async () => {
+    // The redone edit above is unsaved.
+    expect(await state()).toMatchObject({ dirty: true });
+    expect(await hostRun("new")).toBe(true);
+    const dialog = sequencer.getByRole("dialog", { name: "Discard unsaved changes to this song?" });
+    await dialog.waitFor();
+    await page.waitForFunction(
+      () => !(window as unknown as HostWindow).sequencerApp?.state.available.togglePlay,
+    );
+    expect(Object.values((await state())["available"] as object)).not.toContain(true);
+    expect(await hostRun("save")).toBe(false);
+    await dialog.locator('button:text-is("discard")').click();
+    await page.waitForFunction(
+      () => (window as unknown as HostWindow).sequencerApp?.state.title === "Untitled",
+    );
+    expect(await state()).toMatchObject({
+      dirty: false,
+      fileName: "untitled.dnbm.json",
+      available: { new: true, save: true, export: true },
+    });
+    // The new song is short, so it exports in a moment.
+    const [download] = await Promise.all([
+      page.waitForEvent("download", { timeout: 20_000 }),
+      hostRun("export"),
+    ]);
+    expect(download.suggestedFilename()).toBe("untitled.wav");
+  }, 30_000);
+
+  test("save as, save and open run from the host's button with the user's activation", async () => {
+    // File pickers as Chromium's: they need the user's activation.
+    await page.evaluate(
+      (song) => {
+        const host = window as unknown as HostWindow & { activations: string[]; written: string[] };
+        host.activations = [];
+        host.written = [];
+        const pick = (name: string) => {
+          host.activations.push(`${name} ${navigator.userActivation.isActive}`);
+          if (!navigator.userActivation.isActive) {
+            throw new DOMException("Must be handling a user gesture.", "SecurityError");
+          }
+        };
+        Object.defineProperty(window, "showSaveFilePicker", {
+          configurable: true,
+          value: async () => {
+            pick("save");
+            return {
+              name: "chosen.dnbm.json",
+              createWritable: async () => ({
+                write: async (text: string) => host.written.push(text),
+                close: async () => {},
+                abort: async () => {},
+              }),
+            };
+          },
+        });
+        Object.defineProperty(window, "showOpenFilePicker", {
+          configurable: true,
+          value: async () => {
+            pick("open");
+            const file = new File([song], "wraith.dnbm.json", { type: "application/json" });
+            return [{ name: file.name, getFile: async () => file }];
+          },
+        });
+      },
+      await readFile(join(installed, "site", "songs", "wraith.dnbm.json"), "utf8"),
+    );
+    try {
+      await sequencer.locator(".title").fill("Night Bus");
+      await sequencer.locator(".title").press("Enter");
+      await page.waitForFunction(() => (window as unknown as HostWindow).sequencerApp?.state.dirty);
+      expect(await hostRun("saveAs")).toBe(true);
+      await page.waitForFunction(
+        () => (window as unknown as HostWindow).sequencerApp?.state.fileName === "chosen.dnbm.json",
+      );
+      expect(await state()).toMatchObject({ title: "Night Bus", dirty: false });
+      // Save writes to the chosen file again, without asking.
+      await sequencer.locator('.grid-row[data-track="0"] .cell').nth(1).click();
+      expect(await hostRun("save")).toBe(true);
+      await page.waitForFunction(
+        () => !(window as unknown as HostWindow).sequencerApp?.state.dirty,
+      );
+      expect(await hostRun("open")).toBe(true);
+      await page.waitForFunction(
+        () => (window as unknown as HostWindow).sequencerApp?.state.title === "Wraith",
+      );
+      expect(
+        await page.evaluate(() => {
+          const host = window as unknown as HostWindow & {
+            activations: string[];
+            written: string[];
+          };
+          return { activations: host.activations, writes: host.written.length };
+        }),
+      ).toEqual({ activations: ["save true", "open true"], writes: 2 });
+    } finally {
+      await page.evaluate(() => {
+        for (const name of ["showOpenFilePicker", "showSaveFilePicker"]) {
+          Object.defineProperty(window, name, { configurable: true, value: undefined });
+        }
+      });
+    }
+    // Without the pickers, open falls back to a file input, which also needs the activation.
+    const chooser = page.waitForEvent("filechooser");
+    expect(await hostRun("open")).toBe(true);
+    await (await chooser).setFiles({
+      name: "undertow.dnbm.json",
+      mimeType: "application/json",
+      buffer: await readFile(join(installed, "site", "songs", "undertow.dnbm.json")),
+    });
+    await page.waitForFunction(
+      () => (window as unknown as HostWindow).sequencerApp?.state.title === "Undertow",
+    );
+    expect(await state()).toMatchObject({ fileName: "undertow.dnbm.json", dirty: false });
+  }, 30_000);
+
+  test("commands the host's destroy interrupts change nothing and reach no one", async () => {
+    const song = () =>
+      page.evaluate(
+        () => (JSON.parse(localStorage.getItem("dnbm:song") ?? "{}") as { title?: string }).title,
+      );
+    // Open: the file is chosen once the app is gone.
+    await freshSequencer();
+    const chooser = page.waitForEvent("filechooser");
+    expect(await hostRun("open")).toBe(true);
+    await page.evaluate(() => (window as unknown as HostWindow).sequencerApp?.destroy());
+    await (await chooser).setFiles({
+      name: "wraith.dnbm.json",
+      mimeType: "application/json",
+      buffer: await readFile(join(installed, "site", "songs", "wraith.dnbm.json")),
+    });
+    await page.waitForTimeout(300);
+    // A fresh mount stores nothing until an edit, and the gone app opened nothing.
+    expect(await song()).toBeUndefined();
+
+    // New, while its dialog asks: the dialog goes with the app.
+    await freshSequencer();
+    await sequencer.locator('.grid-row[data-track="0"] .cell').nth(1).click();
+    await page.evaluate(() => {
+      const host = window as unknown as HostWindow & { heard: unknown[] };
+      host.heard = [];
+      host.sequencerApp?.subscribe((state) => host.heard.push(state));
+    });
+    expect(await hostRun("new")).toBe(true);
+    await sequencer.getByRole("dialog").waitFor();
+    const heard = await page.evaluate(async () => {
+      const host = window as unknown as HostWindow & { heard: unknown[] };
+      const before = host.heard.length;
+      host.sequencerApp?.destroy();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return host.heard.length - before;
+    });
+    expect(heard).toBe(0);
+    expect(await song()).toBe("Undertow");
+
+    // Export: its worker stops, and nothing downloads.
+    await freshSequencer();
+    const downloads: string[] = [];
+    const record = (download: { suggestedFilename(): string }) =>
+      downloads.push(download.suggestedFilename());
+    page.on("download", record);
+    try {
+      const before = await page.evaluate(() => (window as unknown as HostWindow).workers.length);
+      expect(await hostRun("export")).toBe(true);
+      await page.waitForFunction(
+        (count) => (window as unknown as HostWindow).workers.length > count,
+        before,
+      );
+      await page.evaluate(() => (window as unknown as HostWindow).sequencerApp?.destroy());
+      expect(
+        await page.evaluate(() =>
+          (window as unknown as HostWindow).workers.every((worker) => worker.terminated),
+        ),
+      ).toBe(true);
+      await page.waitForTimeout(1_500);
+      expect(downloads).toEqual([]);
+    } finally {
+      page.off("download", record);
+    }
+    expect(errors).toEqual([]);
+  }, 30_000);
+
+  test("the player's state follows the host's controls", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountPlayer());
+    expect(await state("playerApp")).toEqual({
+      playing: false,
+      paused: false,
+      title: "Wraith",
+      shuffle: false,
+      repeat: false,
+      available: {
+        play: true,
+        pause: false,
+        togglePlay: true,
+        stop: false,
+        previous: true,
+        next: true,
+        toggleShuffle: true,
+        toggleRepeat: true,
+      },
+    });
+    /** Waits for the player's state to hold these values. */
+    const until = (expected: Record<string, unknown>) =>
+      page.waitForFunction(
+        (expected) => {
+          const state = (window as unknown as HostWindow).playerApp?.state as unknown as
+            | Record<string, unknown>
+            | undefined;
+          return Object.entries(expected).every(([key, value]) => state?.[key] === value);
+        },
+        expected,
+        { timeout: 15_000 },
+      );
+    expect(await hostRun("togglePlay", "playerApp")).toBe(true);
+    await until({ playing: true, paused: false });
+    expect(await state("playerApp")).toMatchObject({
+      available: { play: false, pause: true, stop: true },
+    });
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("player").querySelector(".time")?.textContent !==
+        "0:00",
+      undefined,
+      { timeout: 15_000 },
+    );
+    expect(await hostRun("pause", "playerApp")).toBe(true);
+    await until({ playing: false, paused: true });
+    expect(await state("playerApp")).toMatchObject({ available: { play: true, pause: false } });
+    expect(await player.locator(".player").getAttribute("data-state")).toBe("paused");
+    expect(await hostRun("pause", "playerApp")).toBe(false);
+    expect(await hostRun("togglePlay", "playerApp")).toBe(true);
+    await until({ playing: true, paused: false });
+    expect(await hostRun("next", "playerApp")).toBe(true);
+    await until({ title: "Undertow", playing: true });
+    // Stopped, previous moves to the song before, however long the last one played.
+    expect(await hostRun("stop", "playerApp")).toBe(true);
+    await until({ playing: false, paused: false });
+    expect(await state("playerApp")).toMatchObject({ available: { stop: false, play: true } });
+    expect(await hostRun("stop", "playerApp")).toBe(false);
+    expect(await hostRun("previous", "playerApp")).toBe(true);
+    await until({ title: "Wraith", playing: false });
+    expect(await hostRun("toggleShuffle", "playerApp")).toBe(true);
+    expect(await hostRun("toggleRepeat", "playerApp")).toBe(true);
+    await until({ shuffle: true, repeat: true });
+    expect(await player.locator(".control.repeat").getAttribute("aria-pressed")).toBe("true");
+    expect(await hostRun("toggleShuffle", "playerApp")).toBe(true);
+    expect(await hostRun("toggleRepeat", "playerApp")).toBe(true);
+    await until({ playing: false, paused: false, shuffle: false, repeat: false });
+    expect(await player.locator(".player").getAttribute("data-state")).toBe("stopped");
+    expect(errors).toEqual([]);
+  }, 40_000);
+
+  test("without their own action buttons, the apps keep their other controls and shortcuts, side by side", async () => {
+    const measure = () =>
+      page.evaluate(() => {
+        const host = window as unknown as HostWindow;
+        const editor = host.shadow("window");
+        const playerRoot = host.shadow("player");
+        const transport = editor.querySelector(".transport");
+        const first = transport?.firstElementChild;
+        return {
+          topBar: editor.querySelector(".topbar")?.getBoundingClientRect().height,
+          // Nothing is left where the play button was.
+          transportStart:
+            (first?.getBoundingClientRect().left ?? 0) -
+            (transport?.getBoundingClientRect().left ?? 0),
+          transport: [...(transport?.children ?? [])].map((child) => child.className),
+          files: [...(editor.querySelector(".files")?.children ?? [])].map(
+            (child) => child.tagName,
+          ),
+          controls: [...(playerRoot.querySelector(".controls")?.children ?? [])].map(
+            (child) => child.className,
+          ),
+        };
+      });
+    await freshSequencer();
+    await page.evaluate(() => (window as unknown as HostWindow).mountPlayer());
+    const shown = await measure();
+    expect(shown.transport[0]).toBe("play");
+    expect(shown.files.filter((tag) => tag === "BUTTON")).toHaveLength(6);
+    expect(shown.controls).toEqual(["transport", "modes", "volume"]);
+
+    await freshSequencer({ actions: false });
+    await page.evaluate(() => (window as unknown as HostWindow).mountPlayer({ actions: false }));
+    const hidden = await measure();
+    expect(hidden).toEqual({
+      topBar: shown.topBar,
+      transportStart: 0,
+      transport: ["segmented", "bpm-field", "control knob", "position"],
+      // The example songs stay: no command opens them.
+      files: ["SELECT"],
+      controls: ["volume"],
+    });
+    expect(await sequencer.locator(".title").isVisible()).toBe(true);
+
+    // Their keys still work inside each, and the host's controls drive both at once.
+    await sequencer.locator(".statusbar").click();
+    await page.keyboard.press("Space");
+    await sequencer.locator(".cell.now").first().waitFor({ timeout: 10_000 });
+    await player.locator(".summary").click();
+    await page.keyboard.press("x");
+    await page.waitForFunction(() => (window as unknown as HostWindow).playerApp?.state.playing);
+    expect(await state()).toMatchObject({ playing: true });
+    expect(await hostRun("stop")).toBe(true);
+    await page.waitForFunction(
+      () => !(window as unknown as HostWindow).sequencerApp?.state.playing,
+    );
+    expect(await state("playerApp")).toMatchObject({ playing: true });
+    expect(await hostRun("stop", "playerApp")).toBe(true);
+    await page.waitForFunction(() => !(window as unknown as HostWindow).playerApp?.state.playing);
+    expect(errors).toEqual([]);
+  }, 40_000);
 });
 
 // The packaged apps with their assets on another origin, which serves them with CORS.

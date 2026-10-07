@@ -61,17 +61,21 @@ dnbm.destroy();
   context, worker, listeners, timers and animation frames. Calling it again does
   nothing, and destroying while the app still loads is safe. Unlike a frame, the app
   doesn't stop when its element merely leaves the page: always call `destroy`.
+- `run`, `state` and `subscribe` let the host's own controls drive the app: see
+  [Drive it from the host's controls](#drive-it-from-the-hosts-controls).
 
 Embedding hides the dnbm wordmark, since the host names the app; pass
 `branding: true` to show it. Importing the module never touches the DOM, so server
 rendering and lazy loading are safe.
 
-Audio starts on the first press inside the app, as browsers require. The app takes
-the keyboard only while focus is inside it, and a press anywhere in it gives it focus:
-keys pressed elsewhere on the host page, or in another app, never reach its
-shortcuts. Presses and keys still bubble out of it to the host, so a host's window
-can raise itself on a press inside the app; a key the app acts on arrives with
-`defaultPrevented` set, so a host's own shortcuts can leave it alone. The app scrolls
+Audio starts on the first press inside the app, or on a command the host runs from
+a press, as browsers require. The app takes the keyboard only while focus is inside
+it, and a press anywhere in it gives it focus: keys pressed elsewhere on the host
+page, or in another app, never reach its shortcuts. Presses and keys still bubble out
+of it to the host, so a host's window can raise itself on a press inside the app, and
+the host's `pointerdown` and `mousedown` listeners hear every press, including one
+that paints steps or turns a knob, so a host's open menu closes. A key the app acts
+on arrives with `defaultPrevented` set, so a host's own shortcuts can leave it alone. The app scrolls
 only its own panels, never the host page. Confirmations and prompts open inside the
 app, over the app only, and the rest of the host page stays usable.
 
@@ -150,6 +154,109 @@ audio context, and as many instances of each as a host likes.
 Asset files are also reachable as `@a2f0/dnbm/assets/<path>` for tooling that
 resolves package files directly. Songs saved from an embedded app are ordinary
 song files; [the song format](song-format.md) describes them.
+
+## Drive it from the host's controls
+
+A host with its own controls, such as a desktop window's File menu, toolbar and
+status bar, drives the app through its instance, never through its shadow root or
+class names. Each instance has three more members:
+
+- `run(command)` carries out a command, as its button or shortcut in the app would,
+  and returns `true`; or it does nothing and returns `false` when the command isn't
+  available now.
+- `state` is the app's state now: a frozen snapshot, which a change replaces with a
+  new object and which otherwise stays the same object, so it suits React's
+  `useSyncExternalStore`.
+- `subscribe(listener)` calls `listener` with the new state after each change, until
+  the function it returns is called or the instance is destroyed.
+
+`subscribe` and `run` don't use `this`, so they can be passed on as they are.
+
+| Sequencer command | Does what |
+| --- | --- |
+| `play`, `stop` | Plays the song from where play starts, or stops it |
+| `togglePlay` | Plays or stops, as Space does |
+| `new` | Starts a new song, after asking to discard unsaved changes |
+| `open` | Opens a song file, after asking to discard unsaved changes (⌘O) |
+| `save` | Saves to the file the song came from, or asks where (⌘S) |
+| `saveAs` | Saves to a new file (⇧⌘S) |
+| `export` | Renders the song to a WAV file and downloads it |
+| `undo`, `redo` | Undoes or redoes an edit (⌘Z, ⇧⌘Z) |
+
+| Player command | Does what |
+| --- | --- |
+| `play` | Plays the current song, or resumes a paused one (X) |
+| `pause` | Pauses (C) |
+| `togglePlay` | Plays or pauses, as Space does |
+| `stop` | Stops, back to the start of the song (V) |
+| `previous`, `next` | Moves to the previous or next song, playing it if playing; past a song's first three seconds, `previous` restarts it (Z, B) |
+| `toggleShuffle`, `toggleRepeat` | Turns shuffle or repeat on or off (S, R) |
+
+The sequencer's state (`DnbmSequencerState`) holds `playing`, the song's `title`, the
+`fileName` it opened from or saves to, `dirty` for unsaved changes, and `available`,
+whether `run` takes each command now. The player's (`DnbmPlayerState`) holds
+`playing`, `paused`, the current song's `title`, `shuffle`, `repeat`, and `available`.
+A command is unavailable when it doesn't apply, as `play` while playing, `stop` while
+stopped or `undo` with nothing to undo; while the sequencer asks something in a
+dialog, none is, as the app behind the dialog takes no input.
+
+The instance's lifetime bounds all of it:
+
+- Before `ready`, nothing in `state` plays, no command is available, and `run`
+  returns `false`. A listener subscribed then hears the app's state at `ready`.
+- Listeners hear of changes in a microtask, never inside the app's own code, and
+  once for several changes made together. A listener that throws is reported, as an
+  event listener's error is, and the others still hear.
+- `destroy()` ends every subscription without a last call, returns `state` to the
+  idle state from before `ready`, and makes `run` return `false`. Work a command
+  started stops as it would from the app's own button: a dialog closes unanswered, a
+  file picked or saved afterwards is neither opened nor written, an export downloads
+  nothing, and audio stays closed. A subscription made after `destroy()` does nothing.
+- If the app can't start, its state stays idle.
+
+`open`, `save` and `saveAs` open a file picker, which browsers allow only with a user
+activation: run them from the host's own click or key handler, not after an `await`
+or a timer. A confirmation the app shows first gets its activation from the user's
+press on it. Where the page has no File System Access pickers, or refuses them, open
+falls back to a file input and save to a download, as in the app. Running a command
+leaves the keyboard where it is; the app's shortcuts still work once a press puts
+focus inside it.
+
+Pass `actions: false` to leave out the app's own buttons for these commands when the
+host shows them, so none shows twice: in the sequencer's top bar, play, new, open,
+save, export, undo and redo; in the player, previous, play, pause, stop, next,
+shuffle and repeat. Everything else stays, and closes up: the song's title, play
+mode, tempo, swing, position, scope and example songs in the sequencer's top bar,
+and the display, seek and volume in the player. Keyboard shortcuts keep working.
+
+In React, an effect mounts the app, and `useSyncExternalStore` follows its state:
+
+```tsx
+const [dnbm, setDnbm] = useState<DnbmSequencerInstance | null>(null);
+useEffect(() => {
+  const instance = mountDnbm(host.current!, { assetsUrl: "/dnbm/", actions: false });
+  setDnbm(instance);
+  return () => instance.destroy();
+}, []);
+
+const subscribe = useCallback(
+  (onChange: () => void) => dnbm?.subscribe(onChange) ?? (() => {}),
+  [dnbm],
+);
+const state = useSyncExternalStore(subscribe, () => dnbm?.state ?? null);
+
+// A toolbar button, a menu item and a title, from the state alone:
+<button disabled={!state?.available.togglePlay} onClick={() => dnbm?.run("togglePlay")}>
+  {state?.playing ? "Stop" : "Play"}
+</button>;
+<MenuItem label="Save" disabled={!state?.available.save} onClick={() => dnbm?.run("save")} />;
+const title = state && `${state.dirty ? "● " : ""}${state.title}`;
+```
+
+`mountDnbm` returns a `DnbmSequencerInstance` and `mountDnbmPlayer` a
+`DnbmPlayerInstance`; `DnbmInstance` is still the part they share. The commands
+live in the app's code in the assets, so copy the assets again when upgrading: an
+app module from before 0.4 takes no commands, and its state stays idle.
 
 ## From 0.2 (iframes) to 0.3
 

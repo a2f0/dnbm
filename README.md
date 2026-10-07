@@ -88,7 +88,11 @@ const player = mountDnbmPlayer(container, { assetsUrl: "/dnbm/", songs });
 ```
 
 The app renders in the host's own document, inside a shadow root that keeps its styles
-and the host's apart, and takes only the keys pressed inside it.
+and the host's apart, and takes only the keys pressed inside it. A host's own
+controls, such as a window's menus and toolbar, can drive it: each instance runs
+commands (`dnbm.run("save")`), reports its state (playing, the song's title, unsaved
+changes, which commands are available) and tells subscribers when it changes, and
+`actions: false` leaves out the app's own buttons for those commands.
 [The package guide](docs/package.md) covers embedding and releases.
 
 ## Layout

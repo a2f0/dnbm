@@ -7,6 +7,7 @@ import { newSong } from "@a2f0/dnbm-synth/song/defaults";
 import { parseSongText, SongError, serializeSong } from "@a2f0/dnbm-synth/song/format";
 import { INSTRUMENTS } from "@a2f0/dnbm-synth/song/instruments";
 import type { Pattern, Song, Track } from "@a2f0/dnbm-synth/song/model";
+import type { DnbmSequencerCommand, DnbmSequencerState } from "../../../src/control";
 import { type ChangeSource, SongStore } from "./store";
 import { DevicePanel } from "./ui/device";
 import { Dialogs } from "./ui/dialog";
@@ -51,6 +52,10 @@ export interface Environment {
   readonly signal: AbortSignal;
   /** Receives the title the app gives its page, when it has a page of its own. */
   readonly onTitle?: ((title: string) => void) | undefined;
+  /** The app shows its own buttons for its commands; false when its host shows them. */
+  readonly actions: boolean;
+  /** Receives the app's state for its host whenever it may have changed. */
+  readonly onState?: ((state: DnbmSequencerState) => void) | undefined;
 }
 
 /**
@@ -105,7 +110,9 @@ export class App {
     readonly environment: Environment,
   ) {
     this.store = new SongStore(song, savedText);
-    this.dialogs = new Dialogs(environment.root, environment.frame, environment.signal);
+    this.dialogs = new Dialogs(environment.root, environment.frame, environment.signal, () =>
+      this.publish(),
+    );
     this.view = {
       patternId: song.patterns[0]?.id ?? "a",
       trackId: song.tracks[0]?.id ?? "",
@@ -241,9 +248,67 @@ export class App {
     );
     this.device.update(song, view);
     this.mixer.update(song, view);
-    const name = this.fileName ?? songFileName(song.title);
-    this.fileLabel.textContent = `${this.store.dirty ? "● " : ""}${name}`;
-    this.environment.onTitle?.(`${this.store.dirty ? "● " : ""}${song.title} · dnbm`);
+    const dirty = this.store.dirty;
+    this.fileLabel.textContent = `${dirty ? "● " : ""}${this.currentFileName()}`;
+    this.environment.onTitle?.(`${dirty ? "● " : ""}${song.title} · dnbm`);
+    this.publish(dirty);
+  }
+
+  /** The file the song opened from or saves to. */
+  private currentFileName(): string {
+    return this.fileName ?? songFileName(this.song.title);
+  }
+
+  /** Which of its commands the app takes now: none while a dialog asks something. */
+  private available(): Record<DnbmSequencerCommand, boolean> {
+    const free = !this.gone && !this.dialogs.isOpen;
+    const { playing } = this.view;
+    return {
+      play: free && !playing,
+      stop: free && playing,
+      togglePlay: free,
+      new: free,
+      open: free,
+      save: free,
+      saveAs: free,
+      export: free,
+      undo: free && this.store.canUndo,
+      redo: free && this.store.canRedo,
+    };
+  }
+
+  /** Tells the host the app's state, which the shell passes on only when it changed. */
+  private publish(dirty = this.store.dirty): void {
+    this.environment.onState?.({
+      playing: this.view.playing,
+      title: this.song.title,
+      fileName: this.currentFileName(),
+      dirty,
+      available: this.available(),
+    });
+  }
+
+  /**
+   * Carries out a command from the host, as its button or shortcut would, if it is
+   * available now; returns whether it did.
+   */
+  run(command: string): boolean {
+    const available: Record<string, boolean> = this.available();
+    if (!Object.hasOwn(available, command) || available[command] !== true) return false;
+    const actions: Record<DnbmSequencerCommand, () => void> = {
+      play: () => void this.play(),
+      stop: () => this.stop(),
+      togglePlay: () => this.togglePlay(),
+      new: () => void this.newSong(),
+      open: () => void this.open(),
+      save: () => void this.save(),
+      saveAs: () => void this.save(true),
+      export: () => void this.exportWav(),
+      undo: () => this.store.undo(),
+      redo: () => this.store.redo(),
+    };
+    actions[command as DnbmSequencerCommand]();
+    return true;
   }
 
   private queueSync(): void {
@@ -464,7 +529,7 @@ export class App {
 
   async save(saveAs = false): Promise<void> {
     const text = serializeSong(this.song);
-    const name = this.fileName ?? songFileName(this.song.title);
+    const name = this.currentFileName();
     try {
       const handle = await saveSongFile(
         text,

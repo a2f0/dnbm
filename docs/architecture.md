@@ -19,13 +19,25 @@ script (`main.ts`) mounts its app through it too, from the assets beside the pag
 The app module (`mount.ts`, built to `mount.js` and `player/mount.js`) renders only
 inside its root. Its frame (`.frame`) scrolls the app, sizes the layout's container
 queries as a frame's window once did, and takes focus on a press anywhere in the app,
-so its shortcuts listen there and hear only their own keys. Dialogs open in the root
+so its shortcuts listen there and hear only their own keys. Presses go on as usual
+(nothing cancels a `pointerdown`), so the host hears them too. Dialogs open in the root
 over the app. URLs resolve from `context.assets`, and the page title goes through
 `context.onTitle`, which only the site's own page passes. When `context.signal`
 aborts, on `destroy()` or a failure to start, the app closes its audio context and
 releases its worker, timers, animation frames and window listener; the shell removes
 the element. The module has no state of its own beyond its code, so any number of
 apps can share a page.
+
+A host drives the app through its instance as well as through presses. The module
+returns a control whose `run(command)` calls the same method the command's button or
+shortcut does, and publishes the app's state (`DnbmSequencerState` or
+`DnbmPlayerState` in `src/control.ts`) through `context.onState` from its `render`,
+and the sequencer also as a dialog opens or closes. The shell keeps that state in a
+`StateChannel`: it holds it back until `ready`, freezes a snapshot only when
+something changed, tells subscribers in a microtask, and on `destroy()` returns to
+the idle state and drops every subscriber before the app lets go. `run` reaches the
+app only between `ready` and `destroy()`. With `actions: false`, the apps leave out
+their buttons for those commands, for a host that shows them in its own chrome.
 
 The shell gives the element `all: initial` inline, which outranks the host page's
 rules for it, so nothing the host sets is inherited into the app; the app's top-level

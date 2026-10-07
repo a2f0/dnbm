@@ -6,6 +6,7 @@ import { EngineHost, type PlayingPosition } from "@a2f0/dnbm-synth/audio/engineH
 import { PlayMode } from "@a2f0/dnbm-synth/audio/wasmEngine";
 import type { Song } from "@a2f0/dnbm-synth/song/model";
 import { STEPS_PER_BAR } from "@a2f0/dnbm-synth/song/notation";
+import type { DnbmPlayerCommand, DnbmPlayerState } from "../../../src/control";
 import { h, icon, setText } from "./dom";
 import { Playlist } from "./playlist";
 import { Spectrum } from "./spectrum";
@@ -23,6 +24,10 @@ export interface PlayerOptions {
   readonly keyboard: HTMLElement;
   /** Aborts when the player goes: it then closes its audio and stops its timers. */
   readonly signal: AbortSignal;
+  /** The player shows its own buttons for its commands; false when its host shows them. */
+  readonly actions?: boolean | undefined;
+  /** Receives the player's state for its host whenever it may have changed. */
+  readonly onState?: ((state: DnbmPlayerState) => void) | undefined;
 }
 
 type State = "stopped" | "playing" | "paused";
@@ -170,14 +175,20 @@ export class Player {
         ]),
         this.seek,
         h("div", { class: "controls" }, [
-          h("div", { class: "transport" }, [
-            this.buttons.previous,
-            this.buttons.play,
-            this.buttons.pause,
-            this.buttons.stop,
-            this.buttons.next,
-          ]),
-          h("div", { class: "modes" }, [this.buttons.shuffle, this.buttons.repeat]),
+          // The buttons for the player's commands, which a host that shows them itself
+          // leaves out.
+          ...(options.actions === false
+            ? []
+            : [
+                h("div", { class: "transport" }, [
+                  this.buttons.previous,
+                  this.buttons.play,
+                  this.buttons.pause,
+                  this.buttons.stop,
+                  this.buttons.next,
+                ]),
+                h("div", { class: "modes" }, [this.buttons.shuffle, this.buttons.repeat]),
+              ]),
           this.volume,
         ]),
         this.status,
@@ -250,6 +261,54 @@ export class Player {
     if (!action) return;
     event.preventDefault();
     action();
+  }
+
+  /** Which of its commands the player takes now: none without songs, or once it goes. */
+  private available(): Record<DnbmPlayerCommand, boolean> {
+    const free = this.songs.length > 0 && !this.options.signal.aborted;
+    return {
+      play: free && this.state !== "playing",
+      pause: free && this.state === "playing",
+      togglePlay: free,
+      stop: free && this.state !== "stopped",
+      previous: free,
+      next: free,
+      toggleShuffle: free,
+      toggleRepeat: free,
+    };
+  }
+
+  /** Tells the host the player's state, which the shell passes on only when it changed. */
+  private publish(): void {
+    this.options.onState?.({
+      playing: this.state === "playing",
+      paused: this.state === "paused",
+      title: this.songs[this.current]?.title ?? "",
+      shuffle: this.playlist.shuffle,
+      repeat: this.playlist.repeat,
+      available: this.available(),
+    });
+  }
+
+  /**
+   * Carries out a command from the host, as its button or shortcut would, if it is
+   * available now; returns whether it did.
+   */
+  run(command: string): boolean {
+    const available: Record<string, boolean> = this.available();
+    if (!Object.hasOwn(available, command) || available[command] !== true) return false;
+    const actions: Record<DnbmPlayerCommand, () => void> = {
+      play: () => void this.play(),
+      pause: () => this.pause(),
+      togglePlay: () => (this.state === "playing" ? this.pause() : void this.play()),
+      stop: () => this.stop(),
+      previous: () => this.previous(),
+      next: () => this.next(),
+      toggleShuffle: () => this.toggleShuffle(),
+      toggleRepeat: () => this.toggleRepeat(),
+    };
+    actions[command as DnbmPlayerCommand]();
+    return true;
   }
 
   /** The volume control's gain: squared, so the control feels even to the ear. */
@@ -450,6 +509,7 @@ export class Player {
   }
 
   private render(): void {
+    this.publish();
     const song = this.songs[this.current];
     const line = this.timelines[this.current];
     if (!song || !line) {
