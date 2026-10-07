@@ -464,7 +464,12 @@ export class App {
     const text = serializeSong(this.song);
     const name = this.fileName ?? songFileName(this.song.title);
     try {
-      const handle = await saveSongFile(text, name, saveAs ? undefined : this.fileHandle);
+      const handle = await saveSongFile(
+        text,
+        name,
+        saveAs ? undefined : this.fileHandle,
+        this.environment.signal,
+      );
       if (handle === null || this.gone) return;
       this.fileHandle = handle;
       this.fileName = handle?.name ?? name;
@@ -504,6 +509,7 @@ export class App {
         signal.removeEventListener("abort", stop);
         end();
       });
+      if (signal.aborted) return;
       const name = songFileName(this.song.title).replace(/\.dnbm\.json$/, ".wav");
       download(new Blob([wav], { type: "audio/wav" }), name);
       this.say(`Exported ${name}.`);

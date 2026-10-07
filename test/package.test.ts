@@ -338,7 +338,7 @@ const HOST_PAGE = `<!doctype html><meta charset="utf-8"><title>host</title>
   div { font: italic 30px serif; color: #777777; background: #ffffff; word-spacing: 9px; }
   button { background: #ffffff; font-size: 30px; }
   .cell, .track { display: none; }
-  #window, #player { float: left; }
+  #window, #player { float: left; direction: rtl; }
 </style>
 <input id="outside" aria-label="outside">
 <button class="play" id="host-play">host</button>
@@ -492,6 +492,7 @@ describe("the packaged app mounted in a host page", () => {
       const helpStyle = getComputedStyle(help);
       const frame = root?.querySelector(".frame");
       return {
+        direction: frame && getComputedStyle(frame).direction,
         helpFont: [
           helpStyle.fontSize,
           helpStyle.fontStyle,
@@ -511,6 +512,8 @@ describe("the packaged app mounted in a host page", () => {
     expect(styles.helpFont).toEqual(["11px", "normal", "normal", "0px", "none", "rgb(84, 84, 84)"]);
     expect(styles.monospace).toBe(true);
     expect(styles.background).toBe("rgb(10, 10, 10)");
+    // The host's right-to-left containers don't mirror the app.
+    expect(styles.direction).toBe("ltr");
     expect(styles.cell).toBe("block");
     // The app's .play rules (a 36px square) never reach the host's own .play button.
     expect(styles.hostPlay[0]).toBe("rgb(255, 255, 255)");
@@ -889,6 +892,51 @@ describe("the packaged app mounted in a host page", () => {
         title?: string;
       },
     ).toMatchObject({ title: "Saved Before" });
+  }, 20_000);
+
+  test("a file chosen in Save As after the host destroys the app is never written", async () => {
+    // A picker the page can answer later, as a user would, writing to a file it records.
+    await page.evaluate(() => {
+      const host = window as unknown as HostWindow & {
+        answerPicker?: () => void;
+        written?: string[];
+      };
+      host.written = [];
+      Object.defineProperty(window, "showSaveFilePicker", {
+        configurable: true,
+        value: () =>
+          new Promise((resolve) => {
+            host.answerPicker = () =>
+              resolve({
+                name: "chosen.dnbm.json",
+                createWritable: async () => ({
+                  write: async (text: string) => host.written?.push(text),
+                  close: async () => {},
+                  abort: async () => {},
+                }),
+              });
+          }),
+      });
+    });
+    try {
+      await sequencer.locator('.files button:text-is("save")').click();
+      await page.waitForFunction(
+        () => (window as unknown as { answerPicker?: unknown }).answerPicker !== undefined,
+      );
+      await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+      await page.evaluate(() => (window as unknown as { answerPicker(): void }).answerPicker());
+      await page.waitForTimeout(300);
+      expect(
+        await page.evaluate(() => (window as unknown as { written: string[] }).written),
+      ).toEqual([]);
+    } finally {
+      await page.evaluate(() =>
+        Object.defineProperty(window, "showSaveFilePicker", {
+          configurable: true,
+          value: undefined,
+        }),
+      );
+    }
   }, 20_000);
 
   test("destroying the app while its audio starts closes the audio context", async () => {

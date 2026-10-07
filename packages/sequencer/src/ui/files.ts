@@ -78,12 +78,15 @@ export function download(blob: Blob, name: string): void {
 
 /**
  * Saves song text: to `handle` if given, else to a file the user picks (or a download).
- * Resolves the handle written to, undefined for a download, or null if cancelled.
+ * Resolves the handle written to, undefined for a download, or null if cancelled, as
+ * when `signal` aborts before anything is written: an app that went while its picker
+ * was open writes nothing.
  */
 export async function saveSongFile(
   text: string,
   name: string,
   handle: FileSystemFileHandle | undefined,
+  signal: AbortSignal,
 ): Promise<FileSystemFileHandle | undefined | null> {
   let target = handle;
   if (!target && picker.showSaveFilePicker) {
@@ -94,11 +97,16 @@ export async function saveSongFile(
       if (!isRefused(error)) throw error;
     }
   }
+  if (signal.aborted) return null;
   if (!target) {
     download(new Blob([text], { type: "application/json" }), name);
     return undefined;
   }
   const writable = await target.createWritable();
+  if (signal.aborted) {
+    await writable.abort();
+    return null;
+  }
   await writable.write(text);
   await writable.close();
   return target;

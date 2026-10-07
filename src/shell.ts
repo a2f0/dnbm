@@ -113,9 +113,11 @@ function loaded(link: HTMLLinkElement): Promise<void> {
 
 // Set on the element itself, where it outranks the host page's rules: `all: initial`
 // keeps the host's rules for its elements (a `div` or `*` rule) off it, so nothing they
-// set is inherited into the app, and the rest sizes it to fill the container.
+// set is inherited into the app, `direction` (which `all` leaves) keeps a right-to-left
+// page from mirroring the apps' left-to-right layout, and the rest sizes it to fill the
+// container.
 const HOST_STYLE =
-  "all:initial;display:block;position:relative;isolation:isolate;width:100%;height:100%;overflow:hidden";
+  "all:initial;direction:ltr;display:block;position:relative;isolation:isolate;width:100%;height:100%;overflow:hidden";
 
 /** Shows why the app couldn't start, in place of the app. */
 function showFailure(root: ShadowRoot, error: unknown): void {
