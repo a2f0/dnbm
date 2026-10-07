@@ -27,39 +27,70 @@ export class EngineHost {
     private readonly output: GainNode,
   ) {}
 
-  /** Starts the engine. Call from a user gesture, so the browser lets audio play. */
-  static async start(wasmUrl = "engine.wasm", workletUrl = "worklet.js"): Promise<EngineHost> {
+  /**
+   * Starts the engine from the engine module and the worklet script. Call from a user
+   * gesture, so the browser lets audio play. Once `signal` aborts, during the start or
+   * after it, the engine closes its audio context.
+   */
+  static async start(
+    wasmUrl: string | URL,
+    workletUrl: string | URL,
+    signal?: AbortSignal,
+  ): Promise<EngineHost> {
+    signal?.throwIfAborted();
     const context = new AudioContext({ latencyHint: "interactive" });
-    const [wasm] = await Promise.all([
-      fetch(wasmUrl).then((response) => {
-        if (!response.ok) throw new Error(`Couldn't load ${wasmUrl} (${response.status}).`);
-        return response.arrayBuffer();
-      }),
-      context.audioWorklet.addModule(workletUrl),
-    ]);
-    const node = new AudioWorkletNode(context, PROCESSOR_NAME, {
-      numberOfInputs: 0,
-      numberOfOutputs: 1,
-      outputChannelCount: [2],
-    });
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 2048;
-    const output = context.createGain();
-    node.connect(analyser);
-    analyser.connect(output);
-    output.connect(context.destination);
+    const abandon = () => void context.close().catch(() => {});
+    signal?.addEventListener("abort", abandon, { once: true });
+    try {
+      const [wasm] = await Promise.all([
+        fetch(wasmUrl, signal ? { signal } : {}).then((response) => {
+          if (!response.ok) throw new Error(`Couldn't load ${wasmUrl} (${response.status}).`);
+          return response.arrayBuffer();
+        }),
+        context.audioWorklet.addModule(workletUrl),
+      ]);
+      signal?.throwIfAborted();
+      const node = new AudioWorkletNode(context, PROCESSOR_NAME, {
+        numberOfInputs: 0,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+      });
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      const output = context.createGain();
+      node.connect(analyser);
+      analyser.connect(output);
+      output.connect(context.destination);
 
-    const host = new EngineHost(context, node, analyser, output);
-    await new Promise<void>((resolve, reject) => {
-      node.port.onmessage = (event: MessageEvent<ProcessorMessage>) => {
-        const message = event.data;
-        if (message.type === "ready") resolve();
-        else if (message.type === "error") reject(new Error(message.message));
-        host.receive(message);
-      };
-      host.send({ type: "init", wasm }, [wasm]);
-    });
-    return host;
+      const host = new EngineHost(context, node, analyser, output);
+      await new Promise<void>((resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+        node.port.onmessage = (event: MessageEvent<ProcessorMessage>) => {
+          const message = event.data;
+          if (message.type === "ready") resolve();
+          else if (message.type === "error") reject(new Error(message.message));
+          host.receive(message);
+        };
+        host.send({ type: "init", wasm }, [wasm]);
+      });
+      signal?.removeEventListener("abort", abandon);
+      signal?.addEventListener("abort", () => host.close(), { once: true });
+      return host;
+    } catch (error) {
+      abandon();
+      throw error;
+    }
+  }
+
+  /** Stops the engine for good: closes its port and its audio context. */
+  close(): void {
+    this.onPosition = undefined;
+    this.onMeters = undefined;
+    this.onError = undefined;
+    this.node.port.onmessage = null;
+    this.node.port.close();
+    this.node.disconnect();
+    void this.context.close().catch(() => {});
   }
 
   private receive(message: ProcessorMessage): void {

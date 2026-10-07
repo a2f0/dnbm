@@ -1,29 +1,17 @@
-// Starts the editor with the last session's song, or the example song on a first visit.
+// The site's own page mounts the editor the way a host does, through the same shell
+// (src/shell.ts) and app module, from the assets beside this script. `?embed` shows it
+// as a host would, without the wordmark.
 
-import { parseSong, parseSongText } from "@a2f0/dnbm-synth/song/format";
-import type { Song } from "@a2f0/dnbm-synth/song/model";
-import undertow from "../../../songs/undertow.dnbm.json";
-import { App, AUTOSAVE_KEY, readStorage, SAVED_KEY } from "./app";
+import { mountApp, SEQUENCER } from "../../../src/shell";
 
-function initialSong(): { song: Song; saved: string | undefined } {
-  const text = readStorage(AUTOSAVE_KEY);
-  if (text) {
-    try {
-      return { song: parseSongText(text), saved: readStorage(SAVED_KEY) ?? undefined };
-    } catch {
-      // An autosave from an older or broken session: start from the example instead.
-    }
-  }
-  return { song: parseSong(undertow), saved: undefined };
-}
-
-// mountDnbm (src/index.ts at the repository root) asks for embed mode, where the host already names the app.
-if (new URLSearchParams(location.search).has("embed")) {
-  document.documentElement.dataset["embed"] = "";
-}
-
-const root = document.getElementById("app");
-if (root) {
-  const { song, saved } = initialSong();
-  new App(root, song, saved);
+const container = document.getElementById("app");
+if (container) {
+  mountApp(container, {
+    ...SEQUENCER,
+    assetsUrl: new URL("./", import.meta.url),
+    embed: new URLSearchParams(location.search).has("embed"),
+    onTitle: (title) => {
+      document.title = title;
+    },
+  });
 }

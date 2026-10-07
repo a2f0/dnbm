@@ -4,20 +4,32 @@ export class Scope {
   readonly element: HTMLCanvasElement;
   private analyser: AnalyserNode | undefined;
   private samples: Float32Array<ArrayBuffer> = new Float32Array(0);
+  private frame: number | undefined;
 
-  constructor() {
+  /** Draws until `signal` aborts. */
+  constructor(private readonly signal: AbortSignal) {
     this.element = Object.assign(document.createElement("canvas"), { className: "scope" });
     this.element.setAttribute("aria-hidden", "true");
+    signal.addEventListener(
+      "abort",
+      () => {
+        if (this.frame !== undefined) cancelAnimationFrame(this.frame);
+        this.analyser = undefined;
+      },
+      { once: true },
+    );
   }
 
   attach(analyser: AnalyserNode): void {
+    if (this.signal.aborted) return;
     this.analyser = analyser;
     this.samples = new Float32Array(analyser.fftSize);
-    requestAnimationFrame(() => this.draw());
+    this.frame = requestAnimationFrame(() => this.draw());
   }
 
   private draw(): void {
     const { analyser, element } = this;
+    this.frame = undefined;
     if (!analyser) return;
     const ratio = window.devicePixelRatio || 1;
     const width = Math.round(element.clientWidth * ratio);
@@ -49,6 +61,6 @@ export class Scope {
       }
       context.stroke();
     }
-    requestAnimationFrame(() => this.draw());
+    this.frame = requestAnimationFrame(() => this.draw());
   }
 }

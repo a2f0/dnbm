@@ -81,11 +81,14 @@ await copyDnbmAssets("./public/dnbm");
 
 import { mountDnbm } from "@a2f0/dnbm";              // in the browser
 const dnbm = mountDnbm(container, { assetsUrl: "/dnbm/" });
+await dnbm.ready;                                     // it shows
 
 import { mountDnbmPlayer } from "@a2f0/dnbm";        // or just the player
 const player = mountDnbmPlayer(container, { assetsUrl: "/dnbm/", songs });
 ```
 
+The app renders in the host's own document, inside a shadow root that keeps its styles
+and the host's apart, and takes only the keys pressed inside it.
 [The package guide](docs/package.md) covers embedding and releases.
 
 ## Layout
@@ -94,7 +97,7 @@ const player = mountDnbmPlayer(container, { assetsUrl: "/dnbm/", songs });
 | --- | --- |
 | `packages/synth/` | The shared synthesizer: the Rust audio engine (`engine/`), its AudioWorklet host, and the song format |
 | `packages/sequencer/` | The editor and mixer (TypeScript and DOM) |
-| `src/` | The npm package's entrypoints: `mountDnbm`, `mountDnbmPlayer`, `copyDnbmAssets` |
+| `src/` | The npm package's entrypoints (`mountDnbm`, `mountDnbmPlayer`, `copyDnbmAssets`), and the shell that mounts an app into a shadow root |
 | `packages/player/` | A playlist player that plays songs through the same synthesizer |
 | `test/` | Repository-wide tests: the packed npm package, and the greys-only rule |
 | `songs/` | Example songs |

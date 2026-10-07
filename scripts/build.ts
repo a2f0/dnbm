@@ -2,6 +2,10 @@
 // export-worker bundles, the sequencer at the root and the player in player/, their
 // static files, the song schema and the example songs. Both apps share one engine.
 //
+// Each app is two bundles: mount.js, the app module that src/shell.ts imports from the
+// assets and mounts into a shadow root, and main.js, its page's script, which mounts it
+// through that same shell.
+//
 //   bun scripts/build.ts            everything
 //   bun scripts/build.ts --engine   just dist/engine.wasm (what the tests load)
 
@@ -26,7 +30,7 @@ const CARGO_OUTPUT = join(
   "release",
   "dnbm_engine.wasm",
 );
-const SEQUENCER_FILES = ["index.html", "styles.css", "icon.svg", "_headers"];
+const SEQUENCER_FILES = ["index.html", "styles.css", "page.css", "icon.svg", "_headers"];
 const PLAYER_FILES = ["index.html", "styles.css"];
 
 // Rust's default WebAssembly features. The release profile strips the section that
@@ -100,12 +104,16 @@ export async function buildWeb(): Promise<void> {
   await bundle(
     [
       join(SEQUENCER, "src", "main.ts"),
+      join(SEQUENCER, "src", "mount.ts"),
       join(SYNTH, "src", "audio", "worklet.ts"),
       join(SYNTH, "src", "audio", "renderWorker.ts"),
     ],
     DIST,
   );
-  await bundle([join(PLAYER, "src", "main.ts")], join(DIST, "player"));
+  await bundle(
+    [join(PLAYER, "src", "main.ts"), join(PLAYER, "src", "mount.ts")],
+    join(DIST, "player"),
+  );
   for (const file of SEQUENCER_FILES) await cp(join(SEQUENCER, file), join(DIST, file));
   for (const file of PLAYER_FILES) await cp(join(PLAYER, file), join(DIST, "player", file));
   await Bun.write(join(DIST, "song.schema.json"), `${JSON.stringify(songSchema(), null, 2)}\n`);

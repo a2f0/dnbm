@@ -6,6 +6,30 @@ never import each other. `scripts/build.ts` bundles the synth into each app, so 
 packages are private and only the root's `@a2f0/dnbm` is published, with its
 entrypoints in `src/`.
 
+## Mounting
+
+Every app runs inside a page that may hold other things: a host's mini-app window, or
+the site's own page. `src/shell.ts` mounts it the same way in both. It appends an
+element to the host's container, attaches an open shadow root, loads the app's
+stylesheet into the root and, in parallel, imports the app module from the assets
+URL, then calls the module's `mount(root, context)`. `mountDnbm` and
+`mountDnbmPlayer` (`src/index.ts`) are thin wrappers over it, and each site page's
+script (`main.ts`) mounts its app through it too, from the assets beside the page.
+
+The app module (`mount.ts`, built to `mount.js` and `player/mount.js`) renders only
+inside its root. Its frame (`.frame`) scrolls the app, sizes the layout's container
+queries as a frame's window once did, and takes focus on a press anywhere in the app,
+so its shortcuts listen there and hear only their own keys. Dialogs open in the root
+over the app. URLs resolve from `context.assets`, and the page title goes through
+`context.onTitle`, which only the site's own page passes. When `context.signal`
+aborts, on `destroy()` or a failure to start, the app closes its audio context and
+releases its worker, timers, animation frames and window listener; the shell removes
+the element. The module has no state of its own beyond its code, so any number of
+apps can share a page.
+
+The stylesheets style `:host` from initial values, so nothing the host page's elements
+inherit reaches the app, and no rule of the app's reaches the host.
+
 | Package | Holds |
 | --- | --- |
 | `synth` (`@a2f0/dnbm-synth`) | The Rust engine (`engine/`), its AudioWorklet host, offline render and WAV export (`src/audio/`), and the song model, format, schema and compiler (`src/song/`) |
@@ -63,10 +87,10 @@ the engine's order, and a test compares it with `packages/synth/src/song/instrum
 
 ## The sequencer (`packages/sequencer/`)
 
-Plain TypeScript and DOM, bundled by `Bun.build` into three files: the page
-(`main.ts`), and from the synth, the worklet (`audio/worklet.ts`) and the WAV export
-worker (`audio/renderWorker.ts`). The AudioContext starts on the first gesture, as browsers
-require. The worklet receives the engine's bytes, instantiates them, and reports the
+Plain TypeScript and DOM, bundled by `Bun.build` into four files: the app module
+(`mount.ts`), the page's script (`main.ts`), and from the synth, the worklet
+(`audio/worklet.ts`) and the WAV export worker (`audio/renderWorker.ts`). The
+AudioContext starts on the first gesture, as browsers require. The worklet receives the engine's bytes, instantiates them, and reports the
 playing step and meter peaks back to the page.
 
 `SongStore` keeps undo history; every edit is normalized exactly as saving would
@@ -79,7 +103,7 @@ where available, and through file inputs and downloads elsewhere.
 `Player` takes an array of songs and plays them in order, shuffled, or repeating,
 through the same `EngineHost`, worklet and engine module as the sequencer. The build
 writes it to `player/` in the site, beside the sequencer, and it loads the engine, the
-worklet and the example songs from the site's root.
+worklet and the example songs from the assets' root.
 
 The engine reports the playing arrangement slot and step; `timeline.ts` turns those
 into seconds, and turns a seek back into the slot it falls in, so seeking lands on a

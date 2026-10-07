@@ -290,7 +290,9 @@ export class Grid {
   }
 
   private cellAt(x: number, y: number): { track: number; step: number } | undefined {
-    const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>(".cell");
+    // The app renders in a shadow root, where the document would only see its host.
+    const root = this.body.getRootNode() as Document | ShadowRoot;
+    const cell = root.elementFromPoint(x, y)?.closest<HTMLElement>(".cell");
     const row = cell?.closest<HTMLElement>(".grid-row");
     if (!cell || !row) return undefined;
     return { track: Number(row.dataset["track"]), step: Number(cell.dataset["step"]) };
@@ -411,7 +413,10 @@ export class Grid {
     this.body.addEventListener("pointerup", () => this.endPaint());
     this.body.addEventListener("pointercancel", () => this.endPaint());
     this.body.addEventListener("lostpointercapture", () => this.endPaint());
-    window.addEventListener("blur", () => this.endPaint());
+    // Losing the window mid-drag ends the paint, for as long as the app lives.
+    window.addEventListener("blur", () => this.endPaint(), {
+      signal: this.app.environment.signal,
+    });
     this.body.addEventListener("contextmenu", (event) => {
       const cell = (event.target as HTMLElement).closest<HTMLElement>(".cell");
       const row = cell?.closest<HTMLElement>(".grid-row");

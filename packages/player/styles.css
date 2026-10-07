@@ -1,7 +1,22 @@
 /* The player is drawn in greys like the sequencer: every colour has equal red, green
    and blue (test/grayscale.test.ts refuses any other). A compact, bevelled skin over a
-   dark display, after the desktop players of old. */
-:root {
+   dark display, after the desktop players of old.
+
+   These styles apply inside the player's shadow root (src/shell.ts), and only there.
+   The host element starts from initial values, so nothing the host page's elements
+   inherit reaches the player. */
+:host {
+  all: initial;
+  display: block;
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 12px / 1.4 var(--mono);
+  -webkit-font-smoothing: antialiased;
   color-scheme: dark;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --bg: #0a0a0a;
@@ -23,14 +38,17 @@
   box-sizing: border-box;
 }
 
-html,
-body {
-  min-height: 100%;
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 12px / 1.4 var(--mono);
-  -webkit-font-smoothing: antialiased;
+/* The player's viewport: it scrolls a player taller than the host's container, and
+   sizes the embedded player, as a frame's window once did. */
+.frame {
+  container-type: size;
+  height: 100%;
+  overflow: auto;
+  scrollbar-color: var(--faint) transparent;
+}
+
+.frame:focus {
+  outline: none;
 }
 
 button,
@@ -46,12 +64,13 @@ input {
 
 .app {
   display: grid;
-  min-height: 100dvh;
+  min-height: 100%;
   padding: 16px;
   place-items: start center;
 }
 
 .failure {
+  margin: 0;
   padding: 24px;
   color: var(--muted);
 }
@@ -290,7 +309,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .tracks {
-  max-height: min(50dvh, 360px);
+  max-height: min(50cqh, 360px);
   margin: 0;
   padding: 2px 0;
   overflow-y: auto;
@@ -345,7 +364,7 @@ input[type="range"]::-moz-range-thumb {
   font-size: 11px;
 }
 
-/* Embedded (mountDnbmPlayer), the player fills its frame, the playlist takes the
+/* Embedded (mountDnbmPlayer), the player fills its container, the playlist takes the
    height left, and the host names the app. */
 [data-embed] .app {
   padding: 0;
@@ -356,7 +375,7 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100dvh;
+  height: 100cqh;
   border: 0;
   border-radius: 0;
 }

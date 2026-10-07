@@ -1,5 +1,6 @@
-// The editor's layout at the sizes it meets embedded in windows and on small screens.
-// Needs Google Chrome, like the package's browser suite.
+// The editor's layout at the sizes it meets embedded in windows and on small screens:
+// the site's page at those sizes, which mounts the app as a host does. Needs Google
+// Chrome, like the package's browser suite.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
@@ -8,7 +9,8 @@ import { build, DIST } from "../../../scripts/build";
 
 interface Layout {
   readonly topBar: number;
-  readonly pageScrolls: boolean;
+  /** The app scrolls inside its frame; the page around it never does. */
+  readonly appScrolls: boolean;
   readonly overflowsSideways: boolean;
   readonly gridScrolls: boolean;
   readonly stacked: boolean;
@@ -24,7 +26,7 @@ beforeAll(async () => {
     port: 0,
     fetch: (request) => {
       const path = new URL(request.url).pathname;
-      const file = Bun.file(join(DIST, path === "/" ? "index.html" : path));
+      const file = Bun.file(join(DIST, path.endsWith("/") ? `${path}index.html` : path));
       return file.size > 0 ? new Response(file) : new Response("Not found", { status: 404 });
     },
   });
@@ -40,17 +42,22 @@ afterAll(async () => {
 async function layout(width: number, height: number): Promise<Layout> {
   const page = await browser.newPage({ viewport: { width, height } });
   try {
-    await page.goto(new URL("/?embed=1", server.url).href);
+    await page.goto(new URL("/?embed", server.url).href);
     await page.waitForSelector(".cell");
     return await page.evaluate(() => {
-      const root = document.documentElement;
-      const grid = document.querySelector(".grid-scroll");
-      const lower = document.querySelector(".lower");
-      if (!grid || !lower) throw new Error("the editor did not render");
+      const page = document.documentElement;
+      const app = document.querySelector("#app > div")?.shadowRoot;
+      const frame = app?.querySelector(".frame");
+      const grid = app?.querySelector(".grid-scroll");
+      const lower = app?.querySelector(".lower");
+      if (!frame || !grid || !lower) throw new Error("the editor did not render");
+      if (page.scrollHeight > innerHeight || page.scrollWidth > innerWidth) {
+        throw new Error("the page around the app scrolls");
+      }
       return {
-        topBar: document.querySelector(".topbar")?.getBoundingClientRect().height ?? 0,
-        pageScrolls: root.scrollHeight > innerHeight,
-        overflowsSideways: root.scrollWidth > innerWidth,
+        topBar: app?.querySelector(".topbar")?.getBoundingClientRect().height ?? 0,
+        appScrolls: frame.scrollHeight > frame.clientHeight,
+        overflowsSideways: frame.scrollWidth > frame.clientWidth,
         gridScrolls: grid.scrollHeight > grid.clientHeight,
         stacked: getComputedStyle(lower).gridTemplateColumns.split(" ").length === 1,
       };
@@ -90,16 +97,16 @@ describe("layout", () => {
     const fitted = await layout(1200, 800);
     expect(fitted.topBar).toBeLessThan(60);
     expect(fitted).toMatchObject({
-      pageScrolls: false,
+      appScrolls: false,
       overflowsSideways: false,
       gridScrolls: false,
       stacked: false,
     });
   });
 
-  test("a short window keeps the desktop arrangement and scrolls the page, not the grid", async () => {
+  test("a short window keeps the desktop arrangement and scrolls the app, not the grid", async () => {
     expect(await layout(880, 520)).toMatchObject({
-      pageScrolls: true,
+      appScrolls: true,
       overflowsSideways: false,
       gridScrolls: false,
       stacked: false,
