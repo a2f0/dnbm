@@ -71,7 +71,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@a2f0/agent-tool": "0.1.6",
+    "@a2f0/agent-tool": "0.1.8",
     "@a2f0/dnbm-synth": "workspace:*",
     "@biomejs/biome": "2.5.15",
     "@tsconfig/strictest": "2.0.8",

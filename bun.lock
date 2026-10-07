@@ -5,7 +5,7 @@
     "": {
       "name": "@a2f0/dnbm",
       "devDependencies": {
-        "@a2f0/agent-tool": "0.1.6",
+        "@a2f0/agent-tool": "0.1.8",
         "@a2f0/dnbm-synth": "workspace:*",
         "@biomejs/biome": "2.5.15",
         "@tsconfig/strictest": "2.0.8",
@@ -35,7 +35,7 @@
     },
   },
   "packages": {
-    "@a2f0/agent-tool": ["@a2f0/agent-tool@0.1.6", "", { "bin": { "agent-tool": "src/index.ts" } }, "sha512-06pcJlFV1ob3hZDjqemujv9HEmiwQykoDQZQha24hKNNXF2JtkOwMVFdJh3ZiYwUx+MO7OgMqCpUwYATcgX8Tg=="],
+    "@a2f0/agent-tool": ["@a2f0/agent-tool@0.1.8", "", { "bin": { "agent-tool": "src/index.ts" } }, "sha512-jluWKgAZ8FvxsdlTg2tiY+hW0D/+XODtIfJRMNCHGWX6XYP1fvZ7iTb6+s8S1JBwFpSaifLtYmOs6olpJ7LyAw=="],
 
     "@a2f0/dnbm-player": ["@a2f0/dnbm-player@workspace:packages/player"],
 
