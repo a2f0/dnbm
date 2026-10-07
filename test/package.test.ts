@@ -1697,6 +1697,29 @@ describe("the packaged app driven by its host's controls", () => {
       page.evaluate(
         () => (JSON.parse(localStorage.getItem("dnbm:song") ?? "{}") as { title?: string }).title,
       );
+    // Open, then destroy in the same task: no file picker opens for the gone app.
+    await freshSequencer();
+    let choosers = 0;
+    const count = () => {
+      choosers += 1;
+    };
+    page.on("filechooser", count);
+    try {
+      await page.evaluate(() => {
+        const host = window as unknown as HostWindow;
+        host.hostAction = () => {
+          host.ran = host.sequencerApp?.run("open");
+          host.sequencerApp?.destroy();
+        };
+      });
+      await page.click("#host-play");
+      expect(await page.evaluate(() => (window as unknown as HostWindow).ran)).toBe(true);
+      await page.waitForTimeout(500);
+      expect(choosers).toBe(0);
+    } finally {
+      page.off("filechooser", count);
+    }
+
     // Open: the file is chosen once the app is gone.
     await freshSequencer();
     const chooser = page.waitForEvent("filechooser");
@@ -1817,6 +1840,18 @@ describe("the packaged app driven by its host's controls", () => {
     expect(await hostRun("stop", "playerApp")).toBe(false);
     expect(await hostRun("previous", "playerApp")).toBe(true);
     await until({ title: "Wraith", playing: false });
+    // A seek while stopped moves where play starts; stop, as its button does, goes back.
+    await player.locator(".seek").evaluate((seek: HTMLInputElement) => {
+      seek.value = "30";
+      seek.dispatchEvent(new Event("change"));
+    });
+    await page.waitForFunction(
+      () => (window as unknown as HostWindow).playerApp?.state.available.stop,
+    );
+    expect(await player.locator(".time").textContent()).not.toBe("0:00");
+    expect(await hostRun("stop", "playerApp")).toBe(true);
+    expect(await player.locator(".time").textContent()).toBe("0:00");
+    expect(await state("playerApp")).toMatchObject({ available: { stop: false } });
     expect(await hostRun("toggleShuffle", "playerApp")).toBe(true);
     expect(await hostRun("toggleRepeat", "playerApp")).toBe(true);
     await until({ shuffle: true, repeat: true });

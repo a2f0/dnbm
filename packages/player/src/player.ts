@@ -270,7 +270,8 @@ export class Player {
       play: free && this.state !== "playing",
       pause: free && this.state === "playing",
       togglePlay: free,
-      stop: free && this.state !== "stopped",
+      // Stopped after a seek, stop still goes back to the start, as its button does.
+      stop: free && (this.state !== "stopped" || this.step !== 0),
       previous: free,
       next: free,
       toggleShuffle: free,

@@ -484,7 +484,9 @@ export class App {
   }
 
   async newSong(): Promise<void> {
-    if (!(await this.confirmDiscard())) return;
+    // The app may go while it asks, or before the answer arrives, as when the host runs
+    // a command and destroys the app at once: then it does nothing more.
+    if (!(await this.confirmDiscard()) || this.gone) return;
     this.load(newSong(), undefined, undefined);
     this.say("New song.");
   }
@@ -502,7 +504,8 @@ export class App {
   }
 
   async open(): Promise<void> {
-    if (!(await this.confirmDiscard())) return;
+    // Gone by now, the app opens no picker.
+    if (!(await this.confirmDiscard()) || this.gone) return;
     try {
       const file = await openSongFile();
       if (file) this.openText(file.text, file.name, file.handle);
@@ -512,7 +515,7 @@ export class App {
   }
 
   async openExample(file: string): Promise<void> {
-    if (!(await this.confirmDiscard())) return;
+    if (!(await this.confirmDiscard()) || this.gone) return;
     try {
       const response = await fetch(this.asset(`songs/${file}`), {
         signal: this.environment.signal,
