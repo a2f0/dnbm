@@ -56,14 +56,24 @@ describe("an instance's state", () => {
     channel.publish({ ...READY, playing: true, dirty: true });
     await settle();
     expect(heard).toEqual([{ ...READY, playing: true, dirty: true }]);
-    // Changed and changed back before anyone heard: nothing to tell, and the snapshot
-    // they have stays the state.
-    const told = channel.state;
-    channel.publish({ ...READY, available: { ...READY.available, undo: true } });
-    channel.publish({ ...READY, playing: true, dirty: true });
+    expect(heard[0]).toBe(channel.state);
+  });
+
+  test("a subscriber that read a change undone in the same task still hears of it", async () => {
+    const channel = new StateChannel(SEQUENCER_IDLE);
+    channel.open();
+    channel.publish(READY);
     await settle();
-    expect(heard).toHaveLength(1);
-    expect(channel.state).toBe(told);
+    channel.publish({ ...READY, playing: true });
+    // As React's useSyncExternalStore does: read the snapshot, then subscribe.
+    const read = channel.state;
+    const heard: DnbmSequencerState[] = [];
+    channel.subscribe((state) => heard.push(state));
+    channel.publish(READY);
+    await settle();
+    expect(read.playing).toBe(true);
+    expect(heard).toEqual([READY]);
+    expect(heard[0]).toBe(channel.state);
   });
 
   test("a listener's error reaches the page without stopping the others", async () => {

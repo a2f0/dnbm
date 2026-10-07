@@ -170,8 +170,8 @@ function report(error: unknown): void {
  * An instance's state and its subscribers. Until `open`, the state is `idle`: the app's
  * published state waits there, as `run` takes no command before the app is ready. A
  * change replaces the snapshot at once and reaches the subscribers in a microtask, never
- * inside the app's own code, once however many changes it made. `close` returns it to
- * `idle` and ends every subscription without a last call.
+ * inside the app's own code, once however many changes it made in between. `close`
+ * returns it to `idle` and ends every subscription without a last call.
  */
 export class StateChannel<State extends object> {
   private current: State;
@@ -242,12 +242,9 @@ export class StateChannel<State extends object> {
   private notify(): void {
     if (this.closed) return;
     const state = this.current;
-    // Changed and changed back since the last call: nothing to tell, and the snapshot
-    // the subscribers have stays the state.
-    if (same(state, this.notified)) {
-      this.current = this.notified;
-      return;
-    }
+    // Every new snapshot is told, even one equal to the last told: a subscriber may
+    // have read a snapshot in between, and must hear of the one that replaced it.
+    if (state === this.notified) return;
     this.notified = state;
     for (const listener of [...this.listeners]) {
       // A listener can destroy the instance, or unsubscribe another.
