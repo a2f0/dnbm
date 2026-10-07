@@ -75,6 +75,8 @@ export class EngineHost {
         };
         host.send({ type: "init", wasm }, [wasm]);
       });
+      // An abort between the engine's reply and here fired no listener above.
+      signal?.throwIfAborted();
       signal?.removeEventListener("abort", abandon);
       signal?.addEventListener("abort", () => host.close(), { once: true });
       return host;

@@ -492,6 +492,9 @@ export class App {
       const wasm = await fetch(this.asset("engine.wasm"), { signal }).then((response) =>
         response.arrayBuffer(),
       );
+      // Gone while the engine loaded: start no worker, which an abort that already
+      // happened would never stop.
+      if (signal.aborted) return;
       const { worker, end } = moduleWorker(this.asset("renderWorker.js"));
       const request: RenderRequest = { wasm, song: this.song, sampleRate: 48_000 };
       let stop = () => {};

@@ -1006,6 +1006,49 @@ describe("the packaged app mounted in a host page", () => {
     await page.unroute("**/engine.wasm");
   }, 20_000);
 
+  test("destroying the app just as its engine reports ready closes the audio context", async () => {
+    await page.evaluate(() => {
+      const host = window as unknown as HostWindow;
+      host.sequencerApp?.destroy();
+      // Destroy the app right after the worklet's ready message is handled, before the
+      // engine's start goes on.
+      const property = Object.getOwnPropertyDescriptor(MessagePort.prototype, "onmessage");
+      Object.defineProperty(MessagePort.prototype, "onmessage", {
+        configurable: true,
+        get(this: MessagePort) {
+          return property?.get?.call(this);
+        },
+        set(this: MessagePort, handler: ((event: MessageEvent) => void) | null) {
+          property?.set?.call(
+            this,
+            handler &&
+              function (this: MessagePort, event: MessageEvent) {
+                handler.call(this, event);
+                if ((event.data as { type?: string })?.type === "ready") {
+                  if (property) Object.defineProperty(MessagePort.prototype, "onmessage", property);
+                  host.sequencerApp?.destroy();
+                }
+              },
+          );
+        },
+      });
+    });
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    await sequencer.locator(".play").click();
+    await page.waitForFunction(() => document.querySelector("#window > div") === null);
+    await page.waitForTimeout(500);
+    expect(
+      await page.evaluate(() =>
+        (window as unknown as HostWindow).contexts.map((context) => context.state),
+      ),
+    ).not.toContain("running");
+    expect(
+      await page.evaluate(() =>
+        (window as unknown as HostWindow).contexts.every((context) => context.state === "closed"),
+      ),
+    ).toBe(true);
+  }, 20_000);
+
   test("destroying the app during a WAV export stops its worker and downloads nothing", async () => {
     await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
     const downloads: string[] = [];
@@ -1031,6 +1074,31 @@ describe("the packaged app mounted in a host page", () => {
     } finally {
       page.off("download", record);
     }
+  }, 20_000);
+
+  test("destroying the app just as its export's engine arrives starts no worker", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountSequencer());
+    const before = await page.evaluate(() => {
+      // Destroy the app once the export's engine bytes are read, before the export
+      // goes on.
+      const host = window as unknown as HostWindow;
+      const native = Response.prototype.arrayBuffer;
+      Response.prototype.arrayBuffer = async function (this: Response) {
+        const bytes = await native.call(this);
+        if (this.url.endsWith("/engine.wasm")) {
+          Response.prototype.arrayBuffer = native;
+          host.sequencerApp?.destroy();
+        }
+        return bytes;
+      };
+      return host.workers.length;
+    });
+    await sequencer.locator('.files button:text-is("export")').click();
+    await page.waitForFunction(() => document.querySelector("#window > div") === null);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as unknown as HostWindow).workers.length)).toBe(
+      before,
+    );
   }, 20_000);
 
   test("destroy releases the audio context, animation frames, listeners and element", async () => {

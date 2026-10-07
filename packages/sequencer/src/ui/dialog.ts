@@ -42,6 +42,8 @@ export class Dialogs {
    * element names the dialog for assistive technology.
    */
   private ask(message: HTMLElement, accept: string, focus?: HTMLElement): Promise<boolean> {
+    // An app that has gone asks nothing: the answer is no.
+    if (this.signal.aborted) return Promise.resolve(false);
     return new Promise((resolve) => {
       message.id = `dialog-message-${++dialogs}`;
       const cancelButton = h("button", { type: "button", text: "cancel" });
