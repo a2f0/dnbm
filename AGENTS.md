@@ -96,18 +96,12 @@ song with the same engine, for checking sound changes offline.
 
 ## Dependency updates
 
-Use the installed `update-dependencies` skill. Run `bun audit` against the baseline
-and final lockfiles; CI also audits dependencies in the lint job. Audits use the
-live advisory database and run separately from `bun run check` and the package
-release checks. The native tooling smoke test checks API compatibility separately.
-
-The exact Miniflare `sharp` override selects 0.35.5, whose prebuilt libvips includes
-librsvg 2.63.2 and fixes
-[GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
-The pinned Wrangler's Miniflare still requests sharp 0.35.4. This patch keeps the
-same Node requirement and image API; it affects development tooling. Remove the
-override once Wrangler's Miniflare includes the fix, then run `bun audit` and
-`bun run check` again.
+Use the installed `update-dependencies` skill and read
+[dependency maintenance](docs/dependency-upgrades.md). Keep reusable procedures
+and active constraints there, updating entries in place and removing resolved
+ones. Put run-specific versions, audits, validation, previews, and held groups
+in the upgrade PR. Keep README focused on the product, setup, and normal usage
+with a short maintenance link; do not append upgrade reports there.
 
 ## Shipping
 

@@ -117,4 +117,5 @@ bun run engine:check   # rustfmt, clippy and cargo test
 bun run fix     # format TypeScript, Rust and songs
 ```
 
-Coding agents follow [`AGENTS.md`](AGENTS.md).
+See [dependency maintenance](docs/dependency-upgrades.md) for upgrade procedures
+and active constraints. Coding agents follow [`AGENTS.md`](AGENTS.md).
