@@ -118,3 +118,11 @@ bun run fix     # format TypeScript, Rust and songs
 ```
 
 Coding agents follow [`AGENTS.md`](AGENTS.md).
+
+For compact output from finite checks, run
+`bun run agent:run --label check -- bun run check`. The harness preserves the
+command's exit status and full private log, prints a small receipt, and includes a
+bounded excerpt on failure. Read the receipt's log with
+`bun run agent-tool logs <log-path>` or a targeted search to inspect warnings,
+timings, and artifacts. Keep review verdicts and structured decision output
+visible, and run interactive tools and persistent servers directly.

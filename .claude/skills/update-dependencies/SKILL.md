@@ -14,6 +14,15 @@ changing global tools; use existing user authorization and `ship-pr` when shippi
 is requested. Default dependency-update merge subject: `chore: update dependencies`,
 subject to repository title policy and any explicit user subject.
 
+Run noisy installs, checks, tests, and builds with
+`agent-tool run --label <check> -- <command> [args...]` to retain full private
+logs and return the original status with compact output. Inspect bounded excerpts
+using `agent-tool logs <log>` and targeted searches for warnings and evidence;
+a successful receipt does not establish a warning-free upgrade. Keep structured
+audit/plan results, deployment previews, and review findings directly visible
+when they drive a safety decision. Do not dump full suite logs into context,
+silence warnings at their source, or change check scope to reduce output.
+
 ## Safety before execution
 
 **Always dry-run before any infrastructure apply or deployment. Never destroy,
@@ -93,7 +102,27 @@ replacement, or unprovable remote effects skip the affected group. Apply the
 equivalent preview and identity checks to other tools rather than assuming they
 share Terraform's guarantees.
 
-Source: [Wrangler command documentation](https://developers.cloudflare.com/workers/wrangler/commands/).
+Do not assume `wrangler d1 migrations list --remote` is read-only. The
+implementation inspected for this skill initializes migration tracking with
+`CREATE TABLE IF NOT EXISTS`; verify the pinned Wrangler version before using
+the command. Verify database identity and compare migration files with the
+database's configured migration tracking table through audited read-only
+queries. A missing table, pending migration, or unverifiable schema/data
+effects hold the affected upgrade/deployment group. Never initialize schema
+merely to establish preview safety.
+
+Wrangler runs a custom `build.command` again during deployment. Use supported
+configuration referencing the same validated artifacts for both preview and
+deployment, preventing another unvalidated build before upload. Bind the
+artifacts, configuration, and pinned tool to the authorized commit, and recheck
+their identities before upload and after relevant changes. Hold the affected
+group if the pinned Wrangler cannot upload the validated output without
+rebuilding it, or if the upload cannot be proven to match the preview.
+
+Sources: [Wrangler command documentation](https://developers.cloudflare.com/workers/wrangler/commands/),
+[D1 migration listing implementation](https://github.com/cloudflare/workers-sdk/blob/e3d186776fcc2e4b5cc4cfd7155591778a375957/packages/wrangler/src/d1/migrations/list.ts),
+[migration table initialization](https://github.com/cloudflare/workers-sdk/blob/e3d186776fcc2e4b5cc4cfd7155591778a375957/packages/wrangler/src/d1/migrations/helpers.ts),
+and [Wrangler custom builds](https://developers.cloudflare.com/workers/wrangler/custom-builds/).
 
 ### Ansible
 
