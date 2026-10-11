@@ -35,7 +35,17 @@ Rust comes from rustup, which installs the toolchain in `rust-toolchain.toml`.
 hook runs it, and CI runs the same checks. The package test mounts the packed apps in
 host pages in Google Chrome (through `playwright-core`), with the assets on the host's
 origin and on another, and loads the site's own pages under its content security
-policy, so checks need Chrome installed, as GitHub's runners have. While iterating:
+policy, so checks need Chrome installed, as GitHub's runners have.
+
+Capture noisy finite commands with the pinned harness, for example
+`bun run agent:run --label check -- bun run check`. It preserves exit status and
+full private logs while returning a compact receipt and a bounded failure excerpt.
+Use `bun run agent-tool logs <log-path>` or a targeted search for more evidence;
+inspect required warnings, timings, and artifacts before accepting a check.
+Keep review verdicts and structured decision output visible. Do not wrap
+interactive tools or persistent servers.
+
+While iterating:
 
 ```sh
 bun run engine:check                 # rustfmt, clippy -D warnings, cargo test
