@@ -15,15 +15,33 @@ smoke test checks API compatibility separately. A passed build does not establis
 a clean audit or deployment safety; follow the skill's preview requirements
 before any separately authorized [deployment](deploying.md).
 
-## Active security override
+## Deployment compatibility
 
-The exact Miniflare `sharp` override selects 0.35.5, whose prebuilt libvips
-includes librsvg 2.63.2 and fixes
-[GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
-The pinned Wrangler's Miniflare still requests sharp 0.35.4. This patch keeps
-the same Node requirement and image API; it affects development tooling.
-Remove the override once Wrangler's Miniflare includes the fix, then run
-`bun audit` and `bun run check` again.
+The assets-only Worker has no bindings or migrations; its custom domain belongs
+in a2f0.net's Terraform configuration. Keep routes absent here so Wrangler does
+not take ownership of that domain. Before upgrading Wrangler, compare the live
+Worker version and bindings with this configuration, verify the domain through
+its owning Terraform plan, and preview the exact built assets. A successful
+bundle alone does not verify those identities.
+
+`upload_source_maps: false` preserves the upload policy from before
+[Wrangler 4.150](https://github.com/cloudflare/workers-sdk/releases/tag/wrangler%404.150.0)
+changed its default. The site's existing linked source maps remain static assets.
+Revisit this explicit setting only when changing the source-map publication policy.
+
+The `DNBM_DEPLOY` switch controls automatic main-branch deployment. Before enabling
+it, add an authenticated preview and identity guard to that job, covering the
+existing Worker and Terraform-owned domain, and bind deployment to the checked
+artifacts. The ordinary CI dry-run checks bundling without that remote proof.
+
+## Release tools
+
+Keep the npm pack job's mise cache disabled. Its output is the artifact consumed
+by the trusted publisher; restoring tools from a lower-trust cache can alter that
+artifact. This follows the
+[mise-action release workflow guidance](https://github.com/jdx/mise-action#release-workflows).
+The test jobs may cache tools, while the publish job consumes only the packed
+artifact and keeps package-manager caching disabled.
 
 ## Recording an upgrade
 

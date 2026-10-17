@@ -40,14 +40,14 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7  # v5.2.0
         with:
-          version: 2026.10.3
+          version: 2026.10.13
           install_args: node shellcheck aqua:WebAssembly/binaryen
           cache: true
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2.2.0
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.3
       - run: bun install --frozen-lockfile
       # Everything a merge must pass, including the package suite.
       - run: bun run check
@@ -68,12 +68,12 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2.2.0
         with:
-          bun-version: 1.4.2
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
+          bun-version: 1.4.3
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7  # v5.2.0
         with:
-          version: 2026.10.3
+          version: 2026.10.13
           install_args: node aqua:WebAssembly/binaryen
-          cache: true
+          cache: false
       # Publish only a version newer than npm's latest, so re-runs and out-of-order
       # runs succeed without publishing.
       - id: decide
@@ -113,11 +113,11 @@ jobs:
         with:
           name: npm-package
           path: package
-      # Trusted publishing needs npm 11.5.1 or later; Node 26.10.0 ships 11.19.1. No
+      # Trusted publishing needs npm 11.5.1 or later; Node 26.12.0 ships 11.20.0. No
       # registry-url: its .npmrc would point npm at an empty NODE_AUTH_TOKEN.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
-          node-version: 26.10.0
+          node-version: 26.12.0
           package-manager-cache: false
       # The ./ matters: npm reads a bare `package/<file>.tgz` as a GitHub owner/repo
       # shorthand and tries to clone it.
