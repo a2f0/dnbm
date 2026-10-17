@@ -6,6 +6,16 @@ workspace lockfile; `.mise.toml` pins controller tools, and
 `rust-toolchain.toml` pins Rust and the WebAssembly target. Preserve the
 [package's supported consumer runtimes](package.md) when updating build tools.
 
+## Lockfile regeneration
+
+Bun 1.4.3 writes lockfile format 3 when the manifest has nested overrides, and
+normalizes it to format 2 after they are removed. A lower format number alone
+therefore does not show that an older runtime generated it. Let the pinned Bun
+[regenerate the lockfile](https://bun.com/docs/pm/lockfile), then verify
+`bun --version` and that `bun install --frozen-lockfile` succeeds without changing
+its hash. Never hand-edit the format number. Recheck this behavior when changing
+Bun or introducing another nested override.
+
 ## Audit and validation
 
 Run `bun audit` against the baseline and final lockfiles; CI also audits
