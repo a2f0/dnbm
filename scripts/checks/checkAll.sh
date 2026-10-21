@@ -18,7 +18,7 @@ sh scripts/checks/checkBinaryFiles.sh --all
 step "Linting shell scripts"
 sh scripts/checks/lintScripts.sh
 
-step "Linting and formatting TypeScript, JSON and CSS (Biome)"
+step "Linting and formatting source, docs and workflows (Biome)"
 bunx --no-install biome ci
 
 step "Checking song files are valid and canonical"

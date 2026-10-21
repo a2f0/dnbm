@@ -76,14 +76,14 @@ dnbm is also published to npm as [`@a2f0/dnbm`](https://www.npmjs.com/package/@a
 to embed the whole app in another page or app, such as a mini-app window:
 
 ```ts
-import { copyDnbmAssets } from "@a2f0/dnbm/build";   // in a build script
+import { copyDnbmAssets } from "@a2f0/dnbm/build"; // in a build script
 await copyDnbmAssets("./public/dnbm");
 
-import { mountDnbm } from "@a2f0/dnbm";              // in the browser
+import { mountDnbm } from "@a2f0/dnbm"; // in the browser
 const dnbm = mountDnbm(container, { assetsUrl: "/dnbm/" });
-await dnbm.ready;                                     // it shows
+await dnbm.ready; // it shows
 
-import { mountDnbmPlayer } from "@a2f0/dnbm";        // or just the player
+import { mountDnbmPlayer } from "@a2f0/dnbm"; // or just the player
 const player = mountDnbmPlayer(container, { assetsUrl: "/dnbm/", songs });
 ```
 
@@ -97,16 +97,16 @@ changes, which commands are available) and tells subscribers when it changes, an
 
 ## Layout
 
-| Path | What |
-| --- | --- |
-| `packages/synth/` | The shared synthesizer: the Rust audio engine (`engine/`), its AudioWorklet host, and the song format |
-| `packages/sequencer/` | The editor and mixer (TypeScript and DOM) |
-| `src/` | The npm package's entrypoints (`mountDnbm`, `mountDnbmPlayer`, `copyDnbmAssets`), and the shell that mounts an app into a shadow root |
-| `packages/player/` | A playlist player that plays songs through the same synthesizer |
-| `test/` | Repository-wide tests: the packed npm package, and the greys-only rule |
-| `songs/` | Example songs |
-| `scripts/` | Build, dev server, WAV render, song formatter, git hooks and checks |
-| `docs/` | [Song format](docs/song-format.md), [architecture](docs/architecture.md), [package](docs/package.md), [deploying](docs/deploying.md) |
+| Path                  | What                                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/synth/`     | The shared synthesizer: the Rust audio engine (`engine/`), its AudioWorklet host, and the song format                                 |
+| `packages/sequencer/` | The editor and mixer (TypeScript and DOM)                                                                                             |
+| `src/`                | The npm package's entrypoints (`mountDnbm`, `mountDnbmPlayer`, `copyDnbmAssets`), and the shell that mounts an app into a shadow root |
+| `packages/player/`    | A playlist player that plays songs through the same synthesizer                                                                       |
+| `test/`               | Repository-wide tests: the packed npm package, and the greys-only rule                                                                |
+| `songs/`              | Example songs                                                                                                                         |
+| `scripts/`            | Build, dev server, WAV render, song formatter, git hooks and checks                                                                   |
+| `docs/`               | [Song format](docs/song-format.md), [architecture](docs/architecture.md), [package](docs/package.md), [deploying](docs/deploying.md)  |
 
 ## Development
 

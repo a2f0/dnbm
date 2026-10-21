@@ -4,7 +4,6 @@ A dark drum and bass sequencer and mixer in the browser, hosted at dnbm.a2f0.net
 published to npm as `@a2f0/dnbm` for embedding (for example in a2f0.net's experiment
 mini-apps). It is a Bun workspaces monorepo with three packages, TypeScript and DOM with
 no framework:
-
 - `packages/synth/`: the shared synthesizer. The Rust audio engine compiled to
   WebAssembly (`engine/`), its AudioWorklet host (`src/audio/`), and the song format
   (`src/song/`). Imported as `@a2f0/dnbm-synth/audio/*` and `@a2f0/dnbm-synth/song/*`.

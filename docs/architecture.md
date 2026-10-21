@@ -46,11 +46,11 @@ colours, and no rule of the app's reaches the host. Work
 that outlives the app, such as a file picker still open when it is destroyed, writes
 nothing to storage once its signal has aborted.
 
-| Package | Holds |
-| --- | --- |
+| Package                      | Holds                                                                                                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `synth` (`@a2f0/dnbm-synth`) | The Rust engine (`engine/`), its AudioWorklet host, offline render and WAV export (`src/audio/`), and the song model, format, schema and compiler (`src/song/`) |
-| `sequencer` | The editor: the song store and its panels |
-| `player` | A playlist, a display and transport controls over a list of songs |
+| `sequencer`                  | The editor: the song store and its panels                                                                                                                       |
+| `player`                     | A playlist, a display and transport controls over a list of songs                                                                                               |
 
 ```text
   sequencer UI ──edits──▶  SongStore  ──compileSong──▶  Float32Array
@@ -68,7 +68,6 @@ A Rust crate compiled to `wasm32-unknown-unknown` with no imports and no generat
 glue: `src/lib.rs` exports a C ABI of numbers and pointers into linear memory, and
 `packages/synth/src/audio/wasmEngine.ts` wraps it. `scripts/build.ts` builds it, runs
 `wasm-opt`, and fails if the module imports anything.
-
 - **Sequencer** (`engine.rs`). Steps fire on the first sample at or after their time,
   tracked in fractional samples so tempo never drifts. A render call splits at step
   boundaries, so output is identical whatever the block size: 128-frame worklet quanta,
