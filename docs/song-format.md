@@ -115,4 +115,4 @@ note glides to it without retriggering, as on a monophonic synth.
 
 Parsing ignores spacing and `|`, and accepts `F1`, `Gb1` and lowercase letters.
 Saving writes rows canonically: hit rows group four steps per beat, note rows separate
-beats with two spaces, and `|` separates bars.
+beats with two spaces, and `|`, with a space on each side, separates bars.
