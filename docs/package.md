@@ -44,7 +44,6 @@ dnbm.destroy();
 ```
 
 `mountDnbm` returns at once with an instance:
-
 - `element` is the `HTMLElement` it appended to `container`: a region named by the
   `title` option (default "dnbm drum and bass sequencer"), with the app in its open
   shadow root. It fills the container, which sets the app's size and placement: give
@@ -160,7 +159,6 @@ song files; [the song format](song-format.md) describes them.
 A host with its own controls, such as a desktop window's File menu, toolbar and
 status bar, drives the app through its instance, never through its shadow root or
 class names. Each instance has three more members:
-
 - `run(command)` carries out a command, as its button or shortcut in the app would,
   and returns `true`; or it does nothing and returns `false` when the command isn't
   available now.
@@ -172,25 +170,25 @@ class names. Each instance has three more members:
 
 `subscribe` and `run` don't use `this`, so they can be passed on as they are.
 
-| Sequencer command | Does what |
-| --- | --- |
-| `play`, `stop` | Plays the song from where play starts, or stops it |
-| `togglePlay` | Plays or stops, as Space does |
-| `new` | Starts a new song, after asking to discard unsaved changes |
-| `open` | Opens a song file, after asking to discard unsaved changes (⌘O) |
-| `save` | Saves to the file the song came from, or asks where (⌘S) |
-| `saveAs` | Saves to a new file (⇧⌘S) |
-| `export` | Renders the song to a WAV file and downloads it |
-| `undo`, `redo` | Undoes or redoes an edit (⌘Z, ⇧⌘Z) |
+| Sequencer command | Does what                                                       |
+| ----------------- | --------------------------------------------------------------- |
+| `play`, `stop`    | Plays the song from where play starts, or stops it              |
+| `togglePlay`      | Plays or stops, as Space does                                   |
+| `new`             | Starts a new song, after asking to discard unsaved changes      |
+| `open`            | Opens a song file, after asking to discard unsaved changes (⌘O) |
+| `save`            | Saves to the file the song came from, or asks where (⌘S)        |
+| `saveAs`          | Saves to a new file (⇧⌘S)                                       |
+| `export`          | Renders the song to a WAV file and downloads it                 |
+| `undo`, `redo`    | Undoes or redoes an edit (⌘Z, ⇧⌘Z)                              |
 
-| Player command | Does what |
-| --- | --- |
-| `play` | Plays the current song, or resumes a paused one (X) |
-| `pause` | Pauses (C) |
-| `togglePlay` | Plays or pauses, as Space does |
-| `stop` | Stops, back to the start of the song (V) |
-| `previous`, `next` | Moves to the previous or next song, playing it if playing; past a song's first three seconds, `previous` restarts it (Z, B) |
-| `toggleShuffle`, `toggleRepeat` | Turns shuffle or repeat on or off (S, R) |
+| Player command                  | Does what                                                                                                                   |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `play`                          | Plays the current song, or resumes a paused one (X)                                                                         |
+| `pause`                         | Pauses (C)                                                                                                                  |
+| `togglePlay`                    | Plays or pauses, as Space does                                                                                              |
+| `stop`                          | Stops, back to the start of the song (V)                                                                                    |
+| `previous`, `next`              | Moves to the previous or next song, playing it if playing; past a song's first three seconds, `previous` restarts it (Z, B) |
+| `toggleShuffle`, `toggleRepeat` | Turns shuffle or repeat on or off (S, R)                                                                                    |
 
 The sequencer's state (`DnbmSequencerState`) holds `playing`, the song's `title`, the
 `fileName` it opened from or saves to, `dirty` for unsaved changes, and `available`,
@@ -201,7 +199,6 @@ stopped or `undo` with nothing to undo; while the sequencer asks something in a
 dialog, none is, as the app behind the dialog takes no input.
 
 The instance's lifetime bounds all of it:
-
 - Before `ready`, nothing in `state` plays, no command is available, and `run`
   returns `false`. A listener subscribed then hears the app's state at `ready`.
 - Listeners hear of changes in a microtask, never inside the app's own code, and
@@ -261,7 +258,6 @@ app module from before 0.4 takes no commands, and its state stays idle.
 ## From 0.2 (iframes) to 0.3
 
 Before 0.3, the app ran in an iframe. Hosts upgrading:
-
 - `element` is the app's region element, not an `HTMLIFrameElement`: wait for `ready`
   instead of the frame's `load` event, and reach the app through
   `element.shadowRoot` instead of `contentDocument`. Embedded, the app's `.frame`

@@ -2,7 +2,6 @@
 
 A song is a JSON file, conventionally named `<title>.dnbm.json`. The format is
 designed for source control:
-
 - **Canonical.** Keys come in a fixed order, numbers round to each parameter's step,
   and nothing volatile (timestamps, random ids) is stored. Saving an unchanged song
   rewrites identical bytes, and `bun run songs:check` refuses a file that isn't in
@@ -34,15 +33,15 @@ hand edits.
 }
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `dnbm` | The format version, `1`. New instrument kinds are additive and keep it; a change to existing fields bumps it with a migration |
-| `bpm` | Tempo, 60 to 220 |
-| `swing` | 0 (straight) to 1 (every second sixteenth delayed to a triplet) |
-| `master` | `level` in dB; `glue`, the bus compressor; `drive`, the soft clipper |
-| `reverb` | `size` (decay, 0.4 to 8 s) and `damp` (how fast the tail darkens) |
-| `delay` | `time` in sixteenths, `feedback` up to 0.9, `tone` from dark to bright |
-| `arrangement` | Pattern ids in playing order; the song loops at the end |
+| Field         | Meaning                                                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `dnbm`        | The format version, `1`. New instrument kinds are additive and keep it; a change to existing fields bumps it with a migration |
+| `bpm`         | Tempo, 60 to 220                                                                                                              |
+| `swing`       | 0 (straight) to 1 (every second sixteenth delayed to a triplet)                                                               |
+| `master`      | `level` in dB; `glue`, the bus compressor; `drive`, the soft clipper                                                          |
+| `reverb`      | `size` (decay, 0.4 to 8 s) and `damp` (how fast the tail darkens)                                                             |
+| `delay`       | `time` in sixteenths, `feedback` up to 0.9, `tone` from dark to bright                                                        |
+| `arrangement` | Pattern ids in playing order; the song loops at the end                                                                       |
 
 Saved files write objects one key per line; the examples here are compacted.
 
@@ -65,16 +64,16 @@ an open one. The mixer `level` is in dB (-60 is silent), `pan` runs from -1 to 1
 `lowcut` and `highcut` are filter frequencies in Hz, and `reverb` and `delay` are send
 levels.
 
-| Instrument | Plays | Parameters |
-| --- | --- | --- |
-| `kick` | hits | `tune` Hz, `sweep` (start pitch multiple), `bend` s, `decay` s, `click` |
-| `snare` | hits | `tune` Hz, `tone` (body against noise), `decay` s, `snap` |
-| `hat` | hits | `tone` (pitch multiple), `decay` s, `metal` (squares against noise) |
-| `perc` | hits | `tune` Hz, `decay` s, `bend`, `noise` |
-| `sub` | notes | `glide` s, `attack` s, `release` s, `warmth` |
-| `reese` | notes | `cutoff` Hz, `resonance`, `detune` cents, `sub`, `env`, `decay` s, `rate` (wobble cycle in sixteenths), `wobble`, `glide` s, `release` s |
-| `pluck` | notes | `tone`, `decay`, `release` s |
-| `pad` | notes | `cutoff` Hz, `resonance`, `interval` semitones, `detune` cents, `attack` s, `env`, `decay` s, `rate` (sweep cycle in sixteenths), `sweep`, `release` s |
+| Instrument | Plays | Parameters                                                                                                                                             |
+| ---------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `kick`     | hits  | `tune` Hz, `sweep` (start pitch multiple), `bend` s, `decay` s, `click`                                                                                |
+| `snare`    | hits  | `tune` Hz, `tone` (body against noise), `decay` s, `snap`                                                                                              |
+| `hat`      | hits  | `tone` (pitch multiple), `decay` s, `metal` (squares against noise)                                                                                    |
+| `perc`     | hits  | `tune` Hz, `decay` s, `bend`, `noise`                                                                                                                  |
+| `sub`      | notes | `glide` s, `attack` s, `release` s, `warmth`                                                                                                           |
+| `reese`    | notes | `cutoff` Hz, `resonance`, `detune` cents, `sub`, `env`, `decay` s, `rate` (wobble cycle in sixteenths), `wobble`, `glide` s, `release` s               |
+| `pluck`    | notes | `tone`, `decay`, `release` s                                                                                                                           |
+| `pad`      | notes | `cutoff` Hz, `resonance`, `interval` semitones, `detune` cents, `attack` s, `env`, `decay` s, `rate` (sweep cycle in sixteenths), `sweep`, `release` s |
 
 Ranges and defaults live in `packages/synth/src/song/instruments.ts` and in the schema.
 
@@ -96,24 +95,24 @@ track. A missing row is all rests.
 
 **Hit rows** (kick, snare, hat, perc) take one character per step:
 
-| Symbol | Step |
-| --- | --- |
-| `.` | rest |
-| `o` | ghost (velocity 0.4, about -12 dB) |
-| `x` | hit (0.75) |
-| `X` | accent (1.0) |
+| Symbol | Step                               |
+| ------ | ---------------------------------- |
+| `.`    | rest                               |
+| `o`    | ghost (velocity 0.4, about -12 dB) |
+| `x`    | hit (0.75)                         |
+| `X`    | accent (1.0)                       |
 
 **Note rows** (sub, reese, pluck, pad) take a three-character token per step:
 
-| Token | Step |
-| --- | --- |
+| Token        | Step                                                             |
+| ------------ | ---------------------------------------------------------------- |
 | `F-1`, `G#2` | a note: letter, `-` or `#`, octave (C-0 to B-8; F-1 is 43.65 Hz) |
-| `---` | tie: hold the note through this step |
-| `...` | rest: release the note |
+| `---`        | tie: hold the note through this step                             |
+| `...`        | rest: release the note                                           |
 
 A note sounds until a rest. On `sub`, `reese` and `pad`, a note that follows a held
 note glides to it without retriggering, as on a monophonic synth.
 
 Parsing ignores spacing and `|`, and accepts `F1`, `Gb1` and lowercase letters.
 Saving writes rows canonically: hit rows group four steps per beat, note rows separate
-beats with two spaces, and ` | ` separates bars.
+beats with two spaces, and `|` separates bars.

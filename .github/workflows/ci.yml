@@ -22,14 +22,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Bun, Node and ShellCheck
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7  # v5.2.0
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
-          version: 2026.10.13
+          version: 2026.10.17
           install_args: bun node shellcheck
           cache: true
 
@@ -69,7 +69,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -93,7 +93,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -101,9 +101,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Set up Bun, Node and wasm-opt
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7  # v5.2.0
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
-          version: 2026.10.13
+          version: 2026.10.17
           install_args: bun node aqua:WebAssembly/binaryen
           cache: true
 
@@ -153,7 +153,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -161,9 +161,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Set up Bun, Node and wasm-opt
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7  # v5.2.0
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
-          version: 2026.10.13
+          version: 2026.10.17
           install_args: bun node aqua:WebAssembly/binaryen
           cache: true
 

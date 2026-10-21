@@ -16,7 +16,6 @@ bun run deploy        # build, then wrangler deploy
 ## Deploy from CI
 
 The `deploy` job in `.github/workflows/ci.yml` deploys every push to `main` once:
-
 1. the repository has `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets, and
 2. the repository variable `DNBM_DEPLOY` is `true`.
 
