@@ -3,8 +3,14 @@
 The site is static: `bun run build` writes `dist/`, with the sequencer at its root and
 the player at `/player/`, and an assets-only Cloudflare Worker named `dnbm` serves it
 (`wrangler.jsonc`). `packages/sequencer/_headers` sets the security headers for both,
-including a content security policy that allows WebAssembly compilation and nothing
-else beyond the site's own files.
+including a content security policy that allows WebAssembly compilation, the site's
+own files and click collection at `https://ct.a2f0.net`.
+
+Production builds initialize CT only on the exact `https://dnbm.a2f0.net` origin.
+Development builds, previews, automated browsers and reusable mount APIs do not
+initialize collection. The site is registered as `dnbm`, with apps `sequencer`
+and `player`, and environment `production`; page values are fixed at `/` and
+`/player`. See [click tracking](click-tracking.md) for data and opt-outs.
 
 ## Deploy by hand
 

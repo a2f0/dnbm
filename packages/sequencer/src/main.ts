@@ -3,9 +3,11 @@
 // as a host would, without the wordmark.
 
 import { mountApp, SEQUENCER } from "../../../src/shell";
+import { createSiteTracker } from "../../synth/src/siteTracking";
 
 const container = document.getElementById("app");
 if (container) {
+  createSiteTracker("sequencer")?.init();
   mountApp(container, {
     ...SEQUENCER,
     assetsUrl: new URL("./", import.meta.url),

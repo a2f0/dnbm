@@ -10,6 +10,9 @@ Every drum and bass sound is synthesized, not sampled; steps land on the exact s
 they fall on; and the same engine renders WAV files offline. A song sounds the same in
 the browser, in an export and from the command line.
 
+The standalone site uses [CT click tracking](docs/click-tracking.md). Embedded apps
+leave tracking to their host.
+
 ## Run it
 
 ```sh
