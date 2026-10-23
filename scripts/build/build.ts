@@ -1,6 +1,8 @@
 // Builds the site into dist/: the engine (cargo, then wasm-opt), the worklet and
 // export-worker bundles, the sequencer at the root and the player in player/, their
-// static files, the song schema and the example songs. Both apps share one engine.
+// static files, the favicons (rendered from assets/brand/logo.svg by agent-tool's
+// "favicons" image target), the song schema and the example songs. Both apps share
+// one engine.
 //
 // Each app is two bundles: mount.js, the app module that src/shell.ts imports from the
 // assets and mounts into a shadow root, and main.js, its page's script, which mounts it
@@ -10,7 +12,7 @@
 //   bun scripts/build/build.ts --engine   just dist/engine.wasm (what the tests load)
 
 import { cp, mkdir, readdir, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { parseSongText } from "@a2f0/dnbm-synth/song/format";
 import { songSchema } from "@a2f0/dnbm-synth/song/schema";
 
@@ -21,6 +23,7 @@ const SYNTH = join(ROOT, "packages", "synth");
 const SEQUENCER = join(ROOT, "packages", "sequencer");
 const PLAYER = join(ROOT, "packages", "player");
 const SONGS = join(ROOT, "songs");
+const AGENT_TOOL = join(ROOT, "node_modules", ".bin", "agent-tool");
 const CARGO_MANIFEST = join(SYNTH, "engine", "Cargo.toml");
 const CARGO_OUTPUT = join(
   SYNTH,
@@ -30,7 +33,7 @@ const CARGO_OUTPUT = join(
   "release",
   "dnbm_engine.wasm",
 );
-const SEQUENCER_FILES = ["index.html", "styles.css", "page.css", "icon.svg", "_headers"];
+const SEQUENCER_FILES = ["index.html", "styles.css", "page.css", "_headers"];
 const PLAYER_FILES = ["index.html", "styles.css"];
 
 // Rust's default WebAssembly features. The release profile strips the section that
@@ -44,8 +47,8 @@ const WASM_FEATURES = [
   "--enable-reference-types",
 ];
 
-async function run(command: string[]): Promise<void> {
-  const process = Bun.spawn(command, { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
+async function run(command: string[], stdout: "inherit" | "ignore" = "inherit"): Promise<void> {
+  const process = Bun.spawn(command, { cwd: ROOT, stdout, stderr: "inherit" });
   const code = await process.exited;
   if (code !== 0) throw new Error(`${command.join(" ")} exited with ${code}`);
 }
@@ -72,6 +75,18 @@ export async function buildEngine(): Promise<void> {
       `engine.wasm must not import anything, but imports ${imports.map((i) => `${i.module}.${i.name}`).join(", ")}`,
     );
   }
+}
+
+/**
+ * Renders favicon.svg, favicon.ico and apple-touch-icon.png into dist/ from the "favicons"
+ * target in agent-tool.json. Both pages link them relative to themselves, so they travel
+ * with the pages into the package's site/. Its receipt goes unprinted; errors still show.
+ */
+async function buildFavicons(): Promise<void> {
+  await run(
+    [process.execPath, AGENT_TOOL, "images", "build", "favicons", "--out", relative(ROOT, DIST)],
+    "ignore",
+  );
 }
 
 async function buildSongs(): Promise<void> {
@@ -119,6 +134,7 @@ export async function buildWeb(production = false): Promise<void> {
   );
   for (const file of SEQUENCER_FILES) await cp(join(SEQUENCER, file), join(DIST, file));
   for (const file of PLAYER_FILES) await cp(join(PLAYER, file), join(DIST, "player", file));
+  await buildFavicons();
   await Bun.write(join(DIST, "song.schema.json"), `${JSON.stringify(songSchema(), null, 2)}\n`);
   await buildSongs();
 }

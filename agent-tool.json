@@ -56,6 +56,22 @@
   "binaries": {
     "allow": []
   },
+  "images": {
+    "targets": {
+      "favicons": {
+        "outputs": [
+          { "path": "favicon.svg", "layers": [{ "source": "logo" }] },
+          { "path": "favicon.ico", "sizes": [16, 32, 48], "layers": [{ "source": "logo" }] },
+          {
+            "path": "apple-touch-icon.png",
+            "size": 180,
+            "opaque": true,
+            "layers": [{ "fill": "#0a0a0a" }, { "source": "logo", "scale": 0.8 }]
+          }
+        ]
+      }
+    }
+  },
   "hooks": {
     "files": [
       {

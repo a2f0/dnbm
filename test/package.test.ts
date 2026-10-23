@@ -98,6 +98,9 @@ describe("the published package", () => {
       "lib/build.d.ts",
       "site/index.html",
       "site/page.css",
+      "site/favicon.svg",
+      "site/favicon.ico",
+      "site/apple-touch-icon.png",
       "site/main.js",
       "site/mount.js",
       "site/styles.css",
@@ -276,8 +279,9 @@ console.log(
       const referenced = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(
         (match) => match[1] ?? "",
       );
+      const favicons = ["favicon.ico", "favicon.svg", "apple-touch-icon.png"];
       expect(referenced).toEqual(
-        expect.arrayContaining(["page.css", "mount.js", "styles.css", "main.js"]),
+        expect.arrayContaining(["page.css", "mount.js", "styles.css", "main.js", ...favicons]),
       );
       // What the page, its app module and the shell load, relative to the assets.
       for (const path of [...referenced, "worklet.js", "renderWorker.js", "songs/index.json"]) {
@@ -291,6 +295,10 @@ console.log(
       const playerHtml = await (await fetch(player)).text();
       const playerReferenced = [...playerHtml.matchAll(/(?:src|href)="([^"]+)"/g)].map(
         (match) => match[1] ?? "",
+      );
+      // Both pages share the favicons at the assets' root, so a nested copy serves them too.
+      expect(playerReferenced).toEqual(
+        expect.arrayContaining(favicons.map((favicon) => `../${favicon}`)),
       );
       for (const path of [
         ...playerReferenced,
