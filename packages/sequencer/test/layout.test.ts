@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { type Browser, chromium } from "playwright-core";
-import { build, DIST } from "../../../scripts/build";
+import { build, DIST } from "../../../scripts/build/build";
 
 interface Layout {
   readonly topBar: number;

@@ -3,7 +3,7 @@
 # Bun
 node_modules/
 
-# Build output (scripts/build.ts) and the package (scripts/buildPackage.ts)
+# Build output (scripts/build/build.ts) and the package (scripts/build/buildPackage.ts)
 dist/
 lib/
 site/

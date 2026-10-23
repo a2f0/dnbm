@@ -1,7 +1,7 @@
 // Keeps song files canonical, so they diff and merge cleanly.
 //
-//   bun scripts/songs.ts check [files...]   fail on any invalid or non-canonical song
-//   bun scripts/songs.ts fmt [files...]     rewrite songs canonically
+//   bun scripts/songs/format.ts check [files...]   fail on any invalid or non-canonical song
+//   bun scripts/songs/format.ts fmt [files...]     rewrite songs canonically
 //
 // Without files, both cover songs/*.dnbm.json.
 
@@ -9,7 +9,7 @@ import { readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { parseSongText, SONG_EXTENSION, serializeSong } from "@a2f0/dnbm-synth/song/format";
 
-const ROOT = join(import.meta.dir, "..");
+const ROOT = join(import.meta.dir, "../..");
 
 async function songFiles(paths: string[]): Promise<string[]> {
   if (paths.length > 0) return paths;
@@ -22,7 +22,7 @@ async function songFiles(paths: string[]): Promise<string[]> {
 
 const [command, ...paths] = process.argv.slice(2);
 if (command !== "check" && command !== "fmt") {
-  console.error("Usage: bun scripts/songs.ts check|fmt [files...]");
+  console.error("Usage: bun scripts/songs/format.ts check|fmt [files...]");
   process.exit(2);
 }
 

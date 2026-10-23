@@ -7,7 +7,7 @@
 
 import { watch } from "node:fs";
 import { extname, join, normalize } from "node:path";
-import { build, buildEngine, buildWeb, DIST, ROOT } from "./build";
+import { build, buildEngine, buildWeb, DIST, ROOT } from "../build/build";
 
 const port = Number(process.env["PORT"] ?? 8174);
 

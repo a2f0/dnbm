@@ -2,7 +2,7 @@
 
 Three workspace packages under `packages/`. `synth` is everything that makes sound and
 everything that reads songs; the two apps, `sequencer` and `player`, build on it and
-never import each other. `scripts/build.ts` bundles the synth into each app, so the
+never import each other. `scripts/build/build.ts` bundles the synth into each app, so the
 packages are private and only the root's `@a2f0/dnbm` is published, with its
 entrypoints in `src/`.
 
@@ -66,7 +66,7 @@ nothing to storage once its signal has aborted.
 
 A Rust crate compiled to `wasm32-unknown-unknown` with no imports and no generated
 glue: `src/lib.rs` exports a C ABI of numbers and pointers into linear memory, and
-`packages/synth/src/audio/wasmEngine.ts` wraps it. `scripts/build.ts` builds it, runs
+`packages/synth/src/audio/wasmEngine.ts` wraps it. `scripts/build/build.ts` builds it, runs
 `wasm-opt`, and fails if the module imports anything.
 - **Sequencer** (`engine.rs`). Steps fire on the first sample at or after their time,
   tracked in fractional samples so tempo never drifts. A render call splits at step

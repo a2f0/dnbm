@@ -16,7 +16,10 @@
       "revert",
       "style",
       "test"
-    ]
+    ],
+    "lowercaseInitial": true,
+    "rejectTerminalPeriod": true,
+    "ignoreGenerated": true
   },
   "merge": {
     "requireChecks": true,
@@ -36,5 +39,40 @@
   },
   "pr": {
     "rejectClaudeBranding": true
+  },
+  "branch": {
+    "enforce": true,
+    "types": null,
+    "exempt": ["main"],
+    "maxLength": null
+  },
+  "commits": {
+    "signatures": "present",
+    "signatureHeaderFallback": false,
+    "rejectCoauthors": true,
+    "rejectClaudeAttribution": false,
+    "subjects": true
+  },
+  "binaries": {
+    "allow": []
+  },
+  "hooks": {
+    "files": [
+      {
+        "source": "scripts/git/hooks/commit-msg",
+        "target": "commit-msg",
+        "executable": true
+      },
+      {
+        "source": "scripts/git/hooks/pre-commit",
+        "target": "pre-commit",
+        "executable": true
+      },
+      {
+        "source": "scripts/git/hooks/pre-push",
+        "target": "pre-push",
+        "executable": true
+      }
+    ]
   }
 }

@@ -17,32 +17,35 @@ mounts an app into a shadow root in a host's document and the commands and state
 app offers its host (`src/control.ts`), and the build bundles the synth into each app. `README.md` gives the
 overview and `docs/` the detail: [song format](docs/song-format.md),
 [architecture](docs/architecture.md), [package](docs/package.md),
-[deploying](docs/deploying.md).
+[deploying](docs/deploying.md), [development](docs/development.md).
 
 ## Setup
 
 ```sh
 mise install && bun install
-sh scripts/git/install-hooks.sh
+bun run hooks:install
 ```
 
 Rust comes from rustup, which installs the toolchain in `rust-toolchain.toml`.
+Existing clones migrating from the old hook installer must inspect their installed
+hooks, then run `bun run hooks:install --adopt`; see [development](docs/development.md#git-hooks).
 
 ## Validation
 
-`bun run check` (`scripts/checks/checkAll.sh`) is the full local gate; the pre-push
+`bun run check` (`scripts/testing/check.json`) is the full local gate; the pre-push
 hook runs it, and CI runs the same checks. The package test mounts the packed apps in
 host pages in Google Chrome (through `playwright-core`), with the assets on the host's
 origin and on another, and loads the site's own pages under its content security
 policy, so checks need Chrome installed, as GitHub's runners have.
 
 Capture noisy finite commands with the pinned harness, for example
-`bun run agent:run --label check -- bun run check`. It preserves exit status and
+`bun run agent:run --label tests -- bun run test`. It preserves exit status and
 full private logs while returning a compact receipt and a bounded failure excerpt.
 Use `bun run agent-tool logs <log-path>` or a targeted search for more evidence;
 inspect required warnings, timings, and artifacts before accepting a check.
-Keep review verdicts and structured decision output visible. Do not wrap
-interactive tools or persistent servers.
+`bun run check` already captures each step and prints a durable run-group report;
+run it directly so its structured evidence stays visible. Keep review verdicts
+and structured decision output visible. Do not wrap interactive tools or persistent servers.
 
 While iterating:
 
@@ -65,7 +68,7 @@ song with the same engine, for checking sound changes offline.
 - Branches: `<type>/<name>`, e.g. `feat/clap-voice`. Commits and PR titles: Conventional
   Commits, at most 50 characters, lowercase subject. Commits are signed and carry no
   `Co-authored-by` trailers; the hooks reject both.
-- No binary files in Git (`scripts/checks/checkBinaryFiles.sh`). Every sound is
+- No binary files in Git (`bun run lint:binary-files`). Every sound is
   synthesized; there are no samples to commit.
 - Every colour is a grey with equal red, green and blue (`test/grayscale.test.ts`).
 - The apps run inside host pages (`@a2f0/dnbm` mounts them into a shadow root in the
@@ -127,7 +130,8 @@ The root package is versioned (`versions` in `agent-tool.json`): each shipped PR
 kept. Run `bun run agent-tool versions prepare <pinned-base-sha>` after every integration
 or repair and before each review; it commits the bump as `chore: bump package versions`.
 Each merge that raises the version publishes `@a2f0/dnbm` to npm through
-`.github/workflows/npm-publish.yml`; verify that run and the npm version after merging,
+`.github/workflows/npm-publish.yml`; verify the exact merged release with
+`bun run agent-tool release verify @a2f0/dnbm <version> <merge-sha> --workflow "Publish npm package"`,
 and report a failed publish separately from the merge. The package's public API is
 `mountDnbm`, `mountDnbmPlayer` and `copyDnbmAssets`, with the instances they return and
 the asset layout `copyDnbmAssets` copies, and the commands and state the instances

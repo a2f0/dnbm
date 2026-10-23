@@ -1,7 +1,7 @@
 // Builds the publishable package: plain ESM and declarations for the two entrypoints
 // in lib/, and the built app in site/ for hosts to copy and serve.
 //
-//   bun scripts/buildPackage.ts
+//   bun scripts/build/buildPackage.ts
 
 import { execFileSync } from "node:child_process";
 import { cp, rm } from "node:fs/promises";

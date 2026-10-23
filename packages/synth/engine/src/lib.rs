@@ -1,6 +1,6 @@
 //! dnbm's audio engine: a drum and bass sequencer, synthesizer and mixer, compiled to a
 //! WebAssembly module with no imports. The browser runs it in an AudioWorklet, and
-//! scripts/render.ts runs the same module offline, so a song renders identically in
+//! scripts/songs/render.ts runs the same module offline, so a song renders identically in
 //! both.
 //!
 //! The interface is a C ABI of numbers and pointers into linear memory, so the module
