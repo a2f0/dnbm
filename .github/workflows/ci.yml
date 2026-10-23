@@ -122,6 +122,7 @@ jobs:
   # The single required check (see agent-tool.json).
   gate:
     name: CI gate
+    timeout-minutes: 5
     if: always()
     needs: [lint, engine, web]
     runs-on: ubuntu-latest

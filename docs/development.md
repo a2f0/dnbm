@@ -41,7 +41,8 @@ uses the pinned rustup toolchain and `wasm-opt` from `.mise.toml`.
 through agent-tool. It prints a structured report with per-step logs and source
 fingerprints; `bun run agent-tool runs list --head <commit>` finds stored receipts.
 A failed command or changed source fails the group. Keep this report visible.
-Use the pinned capture harness for other noisy finite commands as described in AGENTS.md. Interactive `bun run dev` runs directly. Check UI changes in a real
+Use the pinned capture harness for other noisy finite commands as described in
+AGENTS.md. Interactive `bun run dev` runs directly. Check UI changes in a real
 browser, and use `bun run render <song>` to inspect audio changes offline.
 
 ## Git hooks
@@ -64,7 +65,9 @@ Signature checks require a present, non-bad signature, not local key trust. Coau
 trailers are rejected. Pre-push validates destination branch names from Git's ref tuples
 and keeps dnbm's first-push base and tree-range selection. Commit checks additionally
 exclude commits already reachable from the named push remote's tracking refs, so
-integrating an updated main branch does not recheck previously published history. CI passes the actual PR branch
+integrating an updated main branch does not recheck previously published history.
+Pre-commit retains detached-HEAD support for rebases and bisects; pre-push still
+checks actual destination refs. CI passes the actual PR branch
 name explicitly, so detached checkouts do not need to be changed to inspect a name.
 
 ## Documentation and releases

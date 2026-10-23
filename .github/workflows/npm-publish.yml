@@ -68,9 +68,9 @@ jobs:
           version: 2026.10.17
           install_args: bun node aqua:WebAssembly/binaryen
           cache: false
+      - run: bun install --frozen-lockfile
       # Publish only a version newer than npm's latest, so re-runs and out-of-order
       # runs succeed without publishing.
-      - run: bun install --frozen-lockfile
       - id: decide
         run: bun run release:plan --github-output
       - if: steps.decide.outputs.publish == 'true'
