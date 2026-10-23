@@ -1,13 +1,15 @@
 // The standalone site's search and sharing metadata (scripts/build/siteMetadata.ts): a
 // production build gives each page a canonical URL, shared tags and JSON-LD, renders the
-// share image, and lists the pages for crawlers. test/package.test.ts checks that the
-// package's pages name the same canonical URLs and leave out the site root's files.
+// share image, lists the pages for crawlers, and adds the 404 page unknown paths get.
+// test/package.test.ts checks that the package's pages name the same canonical URLs and
+// leave out the site root's files.
 
 import { beforeAll, describe, expect, test } from "bun:test";
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildWeb, DIST } from "../scripts/build/build";
-import { SHARE_IMAGE, SITE_PAGES, SITE_URL } from "../scripts/build/siteMetadata";
+import { buildWeb, DIST, NOT_FOUND_PAGE, ROOT } from "../scripts/build/build";
+import { addCrawlerFiles, SHARE_IMAGE, SITE_PAGES, SITE_URL } from "../scripts/build/siteMetadata";
 
 function content(html: string, key: "name" | "property", name: string): string[] {
   const pattern = new RegExp(`<meta\\s+${key}="${name}"\\s+content="([^"]*)"`, "g");
@@ -101,5 +103,57 @@ describe("the production site's metadata", () => {
 
   test("the headers keep every response indexable", async () => {
     expect(await readFile(join(DIST, "_headers"), "utf8")).not.toMatch(/x-robots-tag/i);
+  });
+
+  test("unknown paths get a noindexed 404 page that links to the site's pages", async () => {
+    // Cloudflare answers a path it has no file for with the 404 page and status 404.
+    expect(await readFile(join(ROOT, "wrangler.jsonc"), "utf8")).toMatch(
+      /"not_found_handling":\s*"404-page"/,
+    );
+    const html = await readFile(join(DIST, NOT_FOUND_PAGE), "utf8");
+    expect(/<title>([^<]+)<\/title>/.exec(html)?.[1]).toEndWith(" · dnbm");
+    expect(content(html, "name", "robots")).toEqual(["noindex"]);
+    expect(html).not.toContain('rel="canonical"');
+    expect(html).not.toContain("og:url");
+    expect(html.match(/<h1[\s>]/g)).toHaveLength(1);
+    // It answers at every depth, so its URLs start at the root: its links are the pages'
+    // canonical paths, and everything it loads is in the build.
+    const links = [...html.matchAll(/<a href="([^"]+)"/g)].map((match) => match[1]);
+    expect(links).toEqual(SITE_PAGES.map((page) => page.path));
+    const loads = [...html.matchAll(/<link [^>]*href="([^"]+)"/g)].map((match) => match[1] ?? "");
+    expect(loads.length).toBeGreaterThan(0);
+    for (const path of loads) {
+      expect(path).toStartWith("/");
+      expect(await Bun.file(join(DIST, path)).exists()).toBe(true);
+    }
+  });
+});
+
+describe("the sitemap", () => {
+  test("leaves out noindexed pages, and fails on another page without a canonical link", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "dnbm-sitemap-"));
+    try {
+      await writeFile(
+        join(directory, "index.html"),
+        `<link rel="canonical" href="${SITE_URL}/" />`,
+      );
+      await writeFile(
+        join(directory, "404.html"),
+        '<meta name="robots" content="noindex" /><title>Page Not Found · dnbm</title>',
+      );
+      await addCrawlerFiles(directory);
+      const sitemap = await readFile(join(directory, "sitemap.xml"), "utf8");
+      expect([...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1])).toEqual([
+        `${SITE_URL}/`,
+      ]);
+
+      await mkdir(join(directory, "extra"));
+      await writeFile(join(directory, "extra", "index.html"), "<title>Extra · dnbm</title>");
+      await expect(addCrawlerFiles(directory)).rejects.toThrow(
+        "extra/index.html has no canonical link",
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

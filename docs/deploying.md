@@ -26,10 +26,17 @@ the Worker serves without redirecting), Open Graph and Twitter tags, and `WebSit
 that serves them, such as a2f0.net at `/dnbm/`, presents a duplicate that names the site
 as canonical. Only the production build (`bun run build`) adds the site root's own files:
 `og-image.png`, the share image the tags name, rendered from `assets/brand/logo.svg` by
-the `social` image target in `agent-tool.json`; `robots.txt`; and `sitemap.xml`, which
-lists the canonical link of every page in the build. A page without one fails the build,
-so add a new page to `SITE_PAGES`. Unknown paths answer 404 (`not_found_handling` is
-`none`), and there is no staging site.
+the `social` image target in `agent-tool.json`; `robots.txt`; `sitemap.xml`, which
+lists the canonical link of every page in the build; and `404.html`
+(`packages/sequencer/404.html`). A page without a canonical link fails the build, so add
+a new page to `SITE_PAGES`; only a page marked `noindex`, as the 404 page is, stays out
+of the sitemap. Unknown paths answer 404 with that page (`not_found_handling` is
+`404-page`), which links to the sequencer and the player; `/404` itself answers 200, and
+its `noindex` keeps it out of search. There is no staging site.
+
+The sequencer's page title names the open song once the app loads, as
+"Undertow · Drum and Bass Sequencer · dnbm", so a crawler that runs the script still
+reads what the page is.
 
 ## Deploy by hand
 

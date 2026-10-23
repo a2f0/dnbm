@@ -77,8 +77,8 @@ song with the same engine, for checking sound changes offline.
   targets, never a rendered file.
 - Every build adds the pages' canonical links and sharing tags, hard-coded to
   dnbm.a2f0.net so a host's copy points at the site, and only the production build adds
-  the share image, `robots.txt` and sitemap (`scripts/build/siteMetadata.ts`; see
-  [deploying](docs/deploying.md#search-and-sharing)). Never derive these URLs from the
+  the share image, `robots.txt`, sitemap and 404 page (`scripts/build/siteMetadata.ts`;
+  see [deploying](docs/deploying.md#search-and-sharing)). Never derive these URLs from the
   page's address. Keep each page's title and description in its `index.html`.
 - Every colour is a grey with equal red, green and blue (`test/grayscale.test.ts`).
 - The apps run inside host pages (`@a2f0/dnbm` mounts them into a shadow root in the

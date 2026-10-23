@@ -124,8 +124,14 @@ describe("the published package", () => {
     expect(files).not.toContain("site/_headers");
     // A host's copy of the pages names the site as their canonical URL, so search engines
     // count it a duplicate of dnbm.a2f0.net. The site root's own files stay out: a host
-    // has its own robots.txt and sitemap, and the tags name the site's share image.
-    for (const file of ["site/robots.txt", "site/sitemap.xml", "site/og-image.png"]) {
+    // has its own robots.txt, sitemap and 404 handling, and the tags name the site's
+    // share image.
+    for (const file of [
+      "site/robots.txt",
+      "site/sitemap.xml",
+      "site/og-image.png",
+      "site/404.html",
+    ]) {
       expect(files).not.toContain(file);
     }
     for (const [page, url] of [
@@ -2095,11 +2101,11 @@ describe("the packaged site's own pages", () => {
     try {
       await page.locator(".cell").first().waitFor();
       expect(await page.locator(".brand").isVisible()).toBe(true);
-      expect(await page.title()).toBe("Undertow · dnbm");
+      expect(await page.title()).toBe("Undertow · Drum and Bass Sequencer · dnbm");
       await page.locator(".play").click();
       await page.locator(".cell.now").first().waitFor({ timeout: 10_000 });
       await page.locator('.grid-row[data-track="0"] .cell').nth(1).click();
-      expect(await page.title()).toBe("● Undertow · dnbm");
+      expect(await page.title()).toBe("● Undertow · Drum and Bass Sequencer · dnbm");
       expect(problems).toEqual([]);
     } finally {
       await page.close();

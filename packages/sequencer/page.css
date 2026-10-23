@@ -30,3 +30,28 @@ body {
   padding: 24px;
   color: #8a8a8a;
 }
+
+/* The site's 404 page (404.html). */
+.not-found {
+  padding: 24px;
+  color: #8a8a8a;
+}
+
+.not-found h1 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: #e2e2e2;
+}
+
+.not-found p,
+.not-found ul {
+  margin: 0 0 12px;
+}
+
+.not-found ul {
+  padding-left: 18px;
+}
+
+.not-found a {
+  color: #e2e2e2;
+}

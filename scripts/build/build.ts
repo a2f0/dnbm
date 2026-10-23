@@ -3,8 +3,8 @@
 // static files, the favicons (rendered from assets/brand/logo.svg by agent-tool's
 // "favicons" image target), the song schema and the example songs. Both apps share
 // one engine. Every build adds the pages' search and sharing tags, which name
-// dnbm.a2f0.net, and a production build (the site's) also its share image, robots.txt
-// and sitemap (siteMetadata.ts).
+// dnbm.a2f0.net, and a production build (the site's) also its 404 page, share image,
+// robots.txt and sitemap (siteMetadata.ts).
 //
 // Each app is two bundles: mount.js, the app module that src/shell.ts imports from the
 // assets and mounts into a shadow root, and main.js, its page's script, which mounts it
@@ -38,6 +38,8 @@ const CARGO_OUTPUT = join(
 );
 const SEQUENCER_FILES = ["index.html", "styles.css", "page.css", "_headers"];
 const PLAYER_FILES = ["index.html", "styles.css"];
+/** The page Cloudflare answers unknown paths with (not_found_handling in wrangler.jsonc). */
+export const NOT_FOUND_PAGE = "404.html";
 
 // Rust's default WebAssembly features. The release profile strips the section that
 // would let wasm-opt detect them, so they are listed here.
@@ -150,7 +152,9 @@ export async function buildWeb(production = false): Promise<void> {
   await Bun.write(join(DIST, "song.schema.json"), `${JSON.stringify(songSchema(), null, 2)}\n`);
   await buildSongs();
   if (production) {
-    // Files only the site's root serves: hosts have their own robots.txt and sitemap.
+    // Files only the site's root serves: hosts have their own robots.txt, sitemap and
+    // 404 handling.
+    await cp(join(SEQUENCER, NOT_FOUND_PAGE), join(DIST, NOT_FOUND_PAGE));
     await buildImages("social");
     await addCrawlerFiles(DIST);
   }

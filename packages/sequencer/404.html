@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- The site's 404 page: Cloudflare serves it, with status 404, for any path the site
+     doesn't have (not_found_handling in wrangler.jsonc). Only the production build has it,
+     and it is no page of its own, so it stays out of the sitemap and the package. Its
+     URLs start at the site's root because it answers at every depth. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="robots" content="noindex" />
+    <title>Page Not Found · dnbm</title>
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/page.css" />
+  </head>
+  <body>
+    <main class="not-found">
+      <h1>Page not found</h1>
+      <p>dnbm has no page at this address.</p>
+      <ul>
+        <li><a href="/">Open the sequencer</a></li>
+        <li><a href="/player/">Play the example songs in the player</a></li>
+      </ul>
+    </main>
+  </body>
+</html>
