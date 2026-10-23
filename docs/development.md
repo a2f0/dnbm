@@ -8,6 +8,7 @@
 | `packages/player/`    | A playlist player that plays songs through the same synthesizer                                                                       |
 | `test/`               | Repository-wide tests: the packed npm package, and the greys-only rule                                                                |
 | `songs/`              | Example songs                                                                                                                         |
+| `assets/brand/`       | The brand mark (`logo.svg`); the build renders the site's favicons from it (`favicons` in `agent-tool.json`)                          |
 | `scripts/`            | Build, dev server, WAV render, song formatter, git hooks and checks                                                                   |
 | `docs/`               | [Song format](song-format.md), [architecture](architecture.md), [package](package.md), [deploying](deploying.md)                      |
 

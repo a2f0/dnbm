@@ -63,7 +63,7 @@ describe("binary file guard", () => {
     const repo = repository();
     repo.write("packages/player/src/main.ts", "export {};\n");
     repo.write("songs/song.dnbm.json", '{ "dnbm": 1 }\n');
-    repo.write("packages/sequencer/icon.svg", "<svg></svg>\n");
+    repo.write("assets/brand/logo.svg", "<svg></svg>\n");
     repo.git("add", "-A");
     expect(repo.guard("--staged")).toBe(0);
     expect(repo.guard("--all")).toBe(0);

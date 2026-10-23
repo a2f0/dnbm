@@ -70,6 +70,10 @@ song with the same engine, for checking sound changes offline.
   `Co-authored-by` trailers; the hooks reject both.
 - No binary files in Git (`bun run lint:binary-files`). Every sound is
   synthesized; there are no samples to commit.
+- The brand mark is `assets/brand/logo.svg`, plain static SVG as agent-tool's image
+  sources require. The build renders the favicons from it into `dist/` with
+  `agent-tool images build favicons` (the `images` section of `agent-tool.json`); edit
+  the SVG or that target, never a rendered file.
 - Every colour is a grey with equal red, green and blue (`test/grayscale.test.ts`).
 - The apps run inside host pages (`@a2f0/dnbm` mounts them into a shadow root in the
   host's document, and the site's own pages mount them the same way), so an app stays
