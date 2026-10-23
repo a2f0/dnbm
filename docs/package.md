@@ -17,11 +17,11 @@ npm install --save-exact @a2f0/dnbm
 The app is a set of static files: its code (`mount.js`, and `player/mount.js` for
 the player), its stylesheets, an AudioWorklet, a WAV export worker, the WebAssembly
 engine and the example songs, along with the site's own pages and their favicons
-(`favicon.ico`, `favicon.svg` and `apple-touch-icon.png`, which replaced `icon.svg`
-in 0.4.8). The pages link the favicons relative to themselves, so a copy served from
-any path shows them; mounting an app into a host page leaves the host's own favicon
-alone. Copy them into a directory your host serves, from a Node 22+ or Bun build
-script:
+(`favicon.ico`, `favicon.svg` and `apple-touch-icon.png`; `icon.svg`, which the
+pages linked before 0.4.8, is still there). The pages link the favicons relative to
+themselves, so a copy served from any path shows them; mounting an app into a host
+page leaves the host's own favicon alone. Copy them into a directory your host
+serves, from a Node 22+ or Bun build script:
 
 ```ts
 import { copyDnbmAssets } from "@a2f0/dnbm/build";

@@ -3,8 +3,9 @@
 The site is static: `bun run build` writes `dist/`, with the sequencer at its root and
 the player at `/player/`, and an assets-only Cloudflare Worker named `dnbm` serves it
 (`wrangler.jsonc`). The build renders the favicons (`favicon.svg`, `favicon.ico` and
-`apple-touch-icon.png`) into `dist/` from `assets/brand/logo.svg` with
-`agent-tool images build favicons`; they are never committed. `packages/sequencer/_headers` sets the security headers for both,
+`apple-touch-icon.png`, and `icon.svg` for links to the earlier favicon) into `dist/`
+from `assets/brand/logo.svg` with `agent-tool images build favicons`; they are never
+committed. `packages/sequencer/_headers` sets the security headers for both,
 including a content security policy that allows WebAssembly compilation, the site's
 own files and click collection at `https://ct.a2f0.net`.
 

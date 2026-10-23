@@ -101,6 +101,8 @@ describe("the published package", () => {
       "site/favicon.svg",
       "site/favicon.ico",
       "site/apple-touch-icon.png",
+      // The favicon before 0.4.8, kept in the asset layout for hosts that link it.
+      "site/icon.svg",
       "site/main.js",
       "site/mount.js",
       "site/styles.css",

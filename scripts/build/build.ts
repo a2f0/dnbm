@@ -80,7 +80,9 @@ export async function buildEngine(): Promise<void> {
 /**
  * Renders favicon.svg, favicon.ico and apple-touch-icon.png into dist/ from the "favicons"
  * target in agent-tool.json. Both pages link them relative to themselves, so they travel
- * with the pages into the package's site/. Its receipt goes unprinted; errors still show.
+ * with the pages into the package's site/. The target also writes icon.svg, the earlier
+ * favicon, which stays in the package's asset layout. Its receipt goes unprinted; errors
+ * still show.
  */
 async function buildFavicons(): Promise<void> {
   await run(
