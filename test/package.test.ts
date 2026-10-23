@@ -122,6 +122,16 @@ describe("the published package", () => {
     }
     // Cloudflare reads _headers only at a deployment's root; in a host it would just be served.
     expect(files).not.toContain("site/_headers");
+    // The search and sharing metadata names dnbm.a2f0.net, so only the site's production
+    // build carries it (test/siteMetadata.test.ts): a host serves these pages at its own URL.
+    for (const file of ["site/robots.txt", "site/sitemap.xml", "site/og-image.png"]) {
+      expect(files).not.toContain(file);
+    }
+    for (const page of ["index.html", "player/index.html"]) {
+      const html = await readFile(join(installed, "site", page), "utf8");
+      expect(html).not.toMatch(/rel="canonical"|property="og:|name="twitter:|ld\+json/);
+      expect(html).not.toContain("dnbm.a2f0.net");
+    }
 
     const metadata = JSON.parse(
       await readFile(join(installed, "package.json"), "utf8"),
