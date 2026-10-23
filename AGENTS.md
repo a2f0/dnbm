@@ -75,10 +75,11 @@ song with the same engine, for checking sound changes offline.
   `agent-tool images build favicons`, and a production build also renders the share
   image with `social` (the `images` section of `agent-tool.json`); edit the SVG or those
   targets, never a rendered file.
-- Only the production build adds the site's search and sharing metadata
-  (`scripts/build/siteMetadata.ts`; see [deploying](docs/deploying.md#search-and-sharing)),
-  so the package's pages never name dnbm.a2f0.net. Keep each page's title and
-  description in its `index.html`.
+- Every build adds the pages' canonical links and sharing tags, hard-coded to
+  dnbm.a2f0.net so a host's copy points at the site, and only the production build adds
+  the share image, `robots.txt` and sitemap (`scripts/build/siteMetadata.ts`; see
+  [deploying](docs/deploying.md#search-and-sharing)). Never derive these URLs from the
+  page's address. Keep each page's title and description in its `index.html`.
 - Every colour is a grey with equal red, green and blue (`test/grayscale.test.ts`).
 - The apps run inside host pages (`@a2f0/dnbm` mounts them into a shadow root in the
   host's document, and the site's own pages mount them the same way), so an app stays
