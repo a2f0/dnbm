@@ -22,7 +22,7 @@ async function siteHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-await build();
+await build(false);
 let headers = await siteHeaders();
 
 const server = Bun.serve({
@@ -53,7 +53,7 @@ function rebuild(engine: boolean): void {
     engineChanged = false;
     try {
       if (withEngine) await buildEngine();
-      await buildWeb();
+      await buildWeb(false);
       headers = await siteHeaders();
       console.info(`Rebuilt${withEngine ? " engine and" : ""} page; reload to hear it.`);
     } catch (error) {

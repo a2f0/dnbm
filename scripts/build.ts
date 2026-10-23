@@ -87,7 +87,7 @@ async function buildSongs(): Promise<void> {
   await Bun.write(join(destination, "index.json"), `${JSON.stringify(index, null, 2)}\n`);
 }
 
-async function bundle(entrypoints: string[], outdir: string): Promise<void> {
+async function bundle(entrypoints: string[], outdir: string, production: boolean): Promise<void> {
   const result = await Bun.build({
     entrypoints,
     outdir,
@@ -96,11 +96,12 @@ async function bundle(entrypoints: string[], outdir: string): Promise<void> {
     format: "esm",
     minify: true,
     sourcemap: "linked",
+    define: { __DNBM_PRODUCTION__: JSON.stringify(production) },
   });
   if (!result.success) throw new AggregateError(result.logs, "Web build failed");
 }
 
-export async function buildWeb(): Promise<void> {
+export async function buildWeb(production = false): Promise<void> {
   await bundle(
     [
       join(SEQUENCER, "src", "main.ts"),
@@ -109,10 +110,12 @@ export async function buildWeb(): Promise<void> {
       join(SYNTH, "src", "audio", "renderWorker.ts"),
     ],
     DIST,
+    production,
   );
   await bundle(
     [join(PLAYER, "src", "main.ts"), join(PLAYER, "src", "mount.ts")],
     join(DIST, "player"),
+    production,
   );
   for (const file of SEQUENCER_FILES) await cp(join(SEQUENCER, file), join(DIST, file));
   for (const file of PLAYER_FILES) await cp(join(PLAYER, file), join(DIST, "player", file));
@@ -120,10 +123,10 @@ export async function buildWeb(): Promise<void> {
   await buildSongs();
 }
 
-export async function build(): Promise<void> {
+export async function build(production = false): Promise<void> {
   await rm(DIST, { recursive: true, force: true });
   await buildEngine();
-  await buildWeb();
+  await buildWeb(production);
 }
 
 if (import.meta.main) {
@@ -131,7 +134,7 @@ if (import.meta.main) {
     await buildEngine();
     console.info(`Built ${ENGINE_WASM}`);
   } else {
-    await build();
+    await build(true);
     console.info(`Built ${DIST}`);
   }
 }
