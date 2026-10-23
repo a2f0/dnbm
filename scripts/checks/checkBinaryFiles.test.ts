@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..", "..");
-const SCRIPT = join(ROOT, "scripts", "checks", "checkBinaryFiles.sh");
+const AGENT_TOOL = join(ROOT, "node_modules", ".bin", "agent-tool");
 const ATTRIBUTES = await Bun.file(join(ROOT, ".gitattributes")).text();
 // Isolated from the user's git config: no hooks, no signing, a fixed identity.
 const GIT_CONFIG = [
@@ -32,8 +32,14 @@ afterEach(() => {
 function repository() {
   const cwd = mkdtempSync(join(tmpdir(), "dnbm-binary-guard-"));
   repositories.push(cwd);
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith("GIT_")) delete env[key];
+  }
+  env["GIT_CONFIG_GLOBAL"] = "/dev/null";
+  env["GIT_CONFIG_NOSYSTEM"] = "1";
   const git = (...args: string[]) => {
-    const result = spawnSync("git", [...GIT_CONFIG, ...args], { cwd, encoding: "utf8" });
+    const result = spawnSync("git", [...GIT_CONFIG, ...args], { cwd, env, encoding: "utf8" });
     if (result.status !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr}`);
   };
   const write = (path: string, content: string | Uint8Array) => {
@@ -42,7 +48,11 @@ function repository() {
   };
   /** The guard's exit status. */
   const guard = (...args: string[]) =>
-    spawnSync("sh", [SCRIPT, ...args], { cwd, encoding: "utf8" }).status;
+    spawnSync(process.execPath, [AGENT_TOOL, "--repo", cwd, "checks", "binaries", ...args], {
+      cwd,
+      env,
+      encoding: "utf8",
+    }).status;
   git("init", "--quiet", "--initial-branch=main");
   write(".gitattributes", ATTRIBUTES);
   return { git, write, guard };

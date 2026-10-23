@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 description = "dnbm's sequencer, synthesizer and mixer, compiled to WebAssembly"
 
-# cdylib is the .wasm the browser and scripts/render.ts load; rlib lets cargo test
+# cdylib is the .wasm the browser and scripts/songs/render.ts load; rlib lets cargo test
 # exercise the same code natively.
 [lib]
 crate-type = ["cdylib", "rlib"]

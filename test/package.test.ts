@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { type Browser, chromium, type Locator, type Page } from "playwright-core";
-import { buildPackage } from "../scripts/buildPackage";
+import { buildPackage } from "../scripts/build/buildPackage";
 import type {
   DnbmOptions,
   DnbmPlayerInstance,

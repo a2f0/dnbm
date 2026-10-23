@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { ClickEvent } from "@a2f0/ct-client";
 import { createSiteTracker } from "@a2f0/dnbm-synth/standalone/tracking";
 import { type Browser, chromium, type Page } from "playwright-core";
-import { buildWeb, DIST, ROOT } from "../scripts/build";
+import { buildWeb, DIST, ROOT } from "../scripts/build/build";
 
 const ORIGIN = "https://dnbm.a2f0.net";
 const COLLECTOR = "https://ct.a2f0.net/v1/clicks";

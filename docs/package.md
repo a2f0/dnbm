@@ -283,8 +283,10 @@ newer than npm's `latest` with [trusted publishing](https://docs.npmjs.com/trust
 and provenance. No npm token is stored: the publish job runs in the `npm` GitHub
 environment, which only `main` can deploy to, and npm's trusted publisher names
 that environment and `npm-publish.yml`. The workflow runs the full `bun run check`
-first, then builds and packs the tarball without publish rights; the publish job
-receives only that tarball. A deliberate minor or major bump in a PR is kept.
+first. Its pack job installs the exact-pinned agent-tool before
+`bun run release:plan --github-output` decides whether this version is newer and
+unpublished, then builds and packs the tarball without publish rights; the publish
+job receives only that tarball. A deliberate minor or major bump in a PR is kept.
 
 npm adds a trusted publisher only to a package that already exists, so the first
 version is published by hand from an up-to-date `main`. Until then the workflow
@@ -302,3 +304,12 @@ publisher for repository `a2f0/dnbm`, workflow `npm-publish.yml` and environment
 `bun run build:package` builds the package locally (into `lib/` and `site/`), and
 `npm pack` builds and packs it. The site at dnbm.a2f0.net deploys separately
 (see [deploying](deploying.md)).
+
+After merging, verify the publishing workflow and registry artifact for that exact commit:
+
+```sh
+bun run agent-tool release verify @a2f0/dnbm <version> <merge-sha> --workflow "Publish npm package"
+```
+
+The verifier waits for registry propagation and checks package identity, version, and
+tarball integrity. Report a publish failure separately from a successful merge.

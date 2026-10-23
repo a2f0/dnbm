@@ -1,13 +1,13 @@
 // Renders a song file to a 24-bit WAV with the same engine the page plays it with.
 //
-//   bun scripts/render.ts <song.dnbm.json> [out.wav] [--rate 48000] [--loops 1]
+//   bun scripts/songs/render.ts <song.dnbm.json> [out.wav] [--rate 48000] [--loops 1]
 
 import { parseArgs } from "node:util";
 import { renderSong } from "@a2f0/dnbm-synth/audio/offline";
 import { WasmEngine } from "@a2f0/dnbm-synth/audio/wasmEngine";
 import { encodeWav } from "@a2f0/dnbm-synth/audio/wav";
 import { parseSongText } from "@a2f0/dnbm-synth/song/format";
-import { buildEngine, ENGINE_WASM } from "./build";
+import { buildEngine, ENGINE_WASM } from "../build/build";
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
@@ -21,7 +21,7 @@ const { values, positionals } = parseArgs({
 const [input, output = input?.replace(/(\.dnbm)?\.json$/, ".wav")] = positionals;
 if (!input || !output) {
   console.error(
-    "Usage: bun scripts/render.ts <song.dnbm.json> [out.wav] [--rate 48000] [--loops 1]",
+    "Usage: bun scripts/songs/render.ts <song.dnbm.json> [out.wav] [--rate 48000] [--loops 1]",
   );
   process.exit(2);
 }

@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { newSong } from "@a2f0/dnbm-synth/song/defaults";
 import { serializeSong } from "@a2f0/dnbm-synth/song/format";
 import { type Browser, chromium, type Page } from "playwright-core";
-import { build, DIST, ROOT } from "../../../scripts/build";
+import { build, DIST, ROOT } from "../../../scripts/build/build";
 import { clock, timeline } from "../src/timeline";
 
 const SONG_COUNT = readdirSync(join(ROOT, "songs")).filter((file) =>

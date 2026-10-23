@@ -1,0 +1,62 @@
+{
+  "label": "check",
+  "steps": [
+    {
+      "label": "binary-files",
+      "command": ["bun", "run", "lint:binary-files", "--all"]
+    },
+    {
+      "label": "shellcheck",
+      "command": ["bun", "run", "lint:scripts"]
+    },
+    {
+      "label": "biome",
+      "command": ["bun", "run", "lint"]
+    },
+    {
+      "label": "songs",
+      "command": ["bun", "run", "songs:check"]
+    },
+    {
+      "label": "types",
+      "command": ["bun", "run", "typecheck"]
+    },
+    {
+      "label": "skills",
+      "command": ["bun", "run", "agents:check"]
+    },
+    {
+      "label": "rustfmt",
+      "command": ["cargo", "fmt", "--manifest-path", "packages/synth/engine/Cargo.toml", "--check"]
+    },
+    {
+      "label": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "packages/synth/engine/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ]
+    },
+    {
+      "label": "rust-tests",
+      "command": ["cargo", "test", "--manifest-path", "packages/synth/engine/Cargo.toml"]
+    },
+    {
+      "label": "build",
+      "command": ["bun", "run", "build"]
+    },
+    {
+      "label": "tests",
+      "command": ["bun", "test"]
+    },
+    {
+      "label": "deploy-preview",
+      "command": ["bun", "run", "deploy:preview"]
+    }
+  ]
+}

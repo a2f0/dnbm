@@ -18,7 +18,7 @@ leave tracking to their host.
 ```sh
 mise install                      # Bun, Node, ShellCheck and wasm-opt (see .mise.toml)
 bun install
-sh scripts/git/install-hooks.sh   # once per clone
+bun run hooks:install             # once per clone
 bun run dev                       # http://localhost:8174
 ```
 
@@ -98,19 +98,6 @@ changes, which commands are available) and tells subscribers when it changes, an
 `actions: false` leaves out the app's own buttons for those commands.
 [The package guide](docs/package.md) covers embedding and releases.
 
-## Layout
-
-| Path                  | What                                                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/synth/`     | The shared synthesizer: the Rust audio engine (`engine/`), its AudioWorklet host, and the song format                                 |
-| `packages/sequencer/` | The editor and mixer (TypeScript and DOM)                                                                                             |
-| `src/`                | The npm package's entrypoints (`mountDnbm`, `mountDnbmPlayer`, `copyDnbmAssets`), and the shell that mounts an app into a shadow root |
-| `packages/player/`    | A playlist player that plays songs through the same synthesizer                                                                       |
-| `test/`               | Repository-wide tests: the packed npm package, and the greys-only rule                                                                |
-| `songs/`              | Example songs                                                                                                                         |
-| `scripts/`            | Build, dev server, WAV render, song formatter, git hooks and checks                                                                   |
-| `docs/`               | [Song format](docs/song-format.md), [architecture](docs/architecture.md), [package](docs/package.md), [deploying](docs/deploying.md)  |
-
 ## Development
 
 ```sh
@@ -120,5 +107,7 @@ bun run engine:check   # rustfmt, clippy and cargo test
 bun run fix     # format TypeScript, Rust and songs
 ```
 
-See [dependency maintenance](docs/dependency-upgrades.md) for upgrade procedures
+See [development](docs/development.md) for layout, script ownership and validation,
+[package releases](docs/package.md#releases) for publishing, and
+[dependency maintenance](docs/dependency-upgrades.md) for upgrade procedures
 and active constraints. Coding agents follow [`AGENTS.md`](AGENTS.md).

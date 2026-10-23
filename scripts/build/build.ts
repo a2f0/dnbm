@@ -6,15 +6,15 @@
 // assets and mounts into a shadow root, and main.js, its page's script, which mounts it
 // through that same shell.
 //
-//   bun scripts/build.ts            everything
-//   bun scripts/build.ts --engine   just dist/engine.wasm (what the tests load)
+//   bun scripts/build/build.ts            everything
+//   bun scripts/build/build.ts --engine   just dist/engine.wasm (what the tests load)
 
 import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { parseSongText } from "@a2f0/dnbm-synth/song/format";
 import { songSchema } from "@a2f0/dnbm-synth/song/schema";
 
-export const ROOT = join(import.meta.dir, "..");
+export const ROOT = join(import.meta.dir, "../..");
 export const DIST = join(ROOT, "dist");
 export const ENGINE_WASM = join(DIST, "engine.wasm");
 const SYNTH = join(ROOT, "packages", "synth");

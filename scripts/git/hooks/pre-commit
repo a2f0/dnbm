@@ -7,16 +7,16 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
 echo "Linting branch name..."
-sh scripts/checks/lintBranchName.sh
+bun run --silent lint:branch-name
 
 echo "Checking for binary files..."
-sh scripts/checks/checkBinaryFiles.sh --staged
+bun run --silent lint:binary-files --staged
 
 echo "Checking staged files with Biome..."
 bunx --no-install biome check --staged --no-errors-on-unmatched
 
 echo "Checking song files..."
-bun scripts/songs.ts check
+bun run --silent songs:check
 
 if git diff --cached --name-only | grep -q '^packages/synth/engine/'; then
   echo "Checking engine formatting..."

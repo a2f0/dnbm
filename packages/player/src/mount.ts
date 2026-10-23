@@ -10,7 +10,7 @@ import type { AppContext, AppControl } from "../../../src/shell";
 import { h } from "./dom";
 import { Player } from "./player";
 
-/** An entry of songs/index.json, which scripts/build.ts writes. */
+/** An entry of songs/index.json, which scripts/build/build.ts writes. */
 interface SongIndexEntry {
   readonly file: string;
   readonly title: string;

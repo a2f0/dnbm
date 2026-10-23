@@ -1,5 +1,5 @@
 // A typed wrapper around the engine's WebAssembly exports (packages/synth/engine/src/lib.rs). The
-// AudioWorklet, the export worker, scripts/render.ts and the tests all drive the
+// AudioWorklet, the export worker, scripts/songs/render.ts and the tests all drive the
 // engine through it. It uses nothing an AudioWorkletGlobalScope lacks.
 
 interface EngineExports {
