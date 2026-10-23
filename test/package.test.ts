@@ -122,15 +122,19 @@ describe("the published package", () => {
     }
     // Cloudflare reads _headers only at a deployment's root; in a host it would just be served.
     expect(files).not.toContain("site/_headers");
-    // The search and sharing metadata names dnbm.a2f0.net, so only the site's production
-    // build carries it (test/siteMetadata.test.ts): a host serves these pages at its own URL.
+    // A host's copy of the pages names the site as their canonical URL, so search engines
+    // count it a duplicate of dnbm.a2f0.net. The site root's own files stay out: a host
+    // has its own robots.txt and sitemap, and the tags name the site's share image.
     for (const file of ["site/robots.txt", "site/sitemap.xml", "site/og-image.png"]) {
       expect(files).not.toContain(file);
     }
-    for (const page of ["index.html", "player/index.html"]) {
+    for (const [page, url] of [
+      ["index.html", "https://dnbm.a2f0.net/"],
+      ["player/index.html", "https://dnbm.a2f0.net/player/"],
+    ] as const) {
       const html = await readFile(join(installed, "site", page), "utf8");
-      expect(html).not.toMatch(/rel="canonical"|property="og:|name="twitter:|ld\+json/);
-      expect(html).not.toContain("dnbm.a2f0.net");
+      expect(html).toContain(`<link rel="canonical" href="${url}" />`);
+      expect(html).toContain(`<meta property="og:url" content="${url}" />`);
     }
 
     const metadata = JSON.parse(
@@ -288,9 +292,14 @@ console.log(
     try {
       const page = new URL("/apps/dnbm/", server.url);
       const html = await (await fetch(page)).text();
-      const referenced = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(
-        (match) => match[1] ?? "",
-      );
+      // What the page loads from beside it; its canonical link names the site, wherever
+      // the copy is served.
+      const relativeReferences = (text: string) =>
+        [...text.matchAll(/(?:src|href)="([^"]+)"/g)]
+          .map((match) => match[1] ?? "")
+          .filter((reference) => !/^[a-z][a-z0-9+.-]*:/i.test(reference));
+      const referenced = relativeReferences(html);
+      expect(html).toContain('<link rel="canonical" href="https://dnbm.a2f0.net/" />');
       const favicons = ["favicon.ico", "favicon.svg", "apple-touch-icon.png"];
       expect(referenced).toEqual(
         expect.arrayContaining(["page.css", "mount.js", "styles.css", "main.js", ...favicons]),
@@ -305,9 +314,8 @@ console.log(
       // The player, one directory down, loads the same engine and songs.
       const player = new URL("player/", page);
       const playerHtml = await (await fetch(player)).text();
-      const playerReferenced = [...playerHtml.matchAll(/(?:src|href)="([^"]+)"/g)].map(
-        (match) => match[1] ?? "",
-      );
+      const playerReferenced = relativeReferences(playerHtml);
+      expect(playerHtml).toContain('<link rel="canonical" href="https://dnbm.a2f0.net/player/" />');
       // Both pages share the favicons at the assets' root, so a nested copy serves them too.
       expect(playerReferenced).toEqual(
         expect.arrayContaining(favicons.map((favicon) => `../${favicon}`)),

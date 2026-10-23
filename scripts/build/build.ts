@@ -2,8 +2,9 @@
 // export-worker bundles, the sequencer at the root and the player in player/, their
 // static files, the favicons (rendered from assets/brand/logo.svg by agent-tool's
 // "favicons" image target), the song schema and the example songs. Both apps share
-// one engine. A production build (dnbm.a2f0.net's) also adds the site's search and
-// sharing metadata and its share image (siteMetadata.ts).
+// one engine. Every build adds the pages' search and sharing tags, which name
+// dnbm.a2f0.net, and a production build (the site's) also its share image, robots.txt
+// and sitemap (siteMetadata.ts).
 //
 // Each app is two bundles: mount.js, the app module that src/shell.ts imports from the
 // assets and mounts into a shadow root, and main.js, its page's script, which mounts it
@@ -16,7 +17,7 @@ import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { parseSongText } from "@a2f0/dnbm-synth/song/format";
 import { songSchema } from "@a2f0/dnbm-synth/song/schema";
-import { addSiteMetadata } from "./siteMetadata";
+import { addCrawlerFiles, addPageMetadata } from "./siteMetadata";
 
 export const ROOT = join(import.meta.dir, "../..");
 export const DIST = join(ROOT, "dist");
@@ -143,13 +144,15 @@ export async function buildWeb(production = false): Promise<void> {
   );
   for (const file of SEQUENCER_FILES) await cp(join(SEQUENCER, file), join(DIST, file));
   for (const file of PLAYER_FILES) await cp(join(PLAYER, file), join(DIST, "player", file));
+  // The package's pages carry the tags too, so a host's copy points at the site.
+  await addPageMetadata(DIST);
   await buildFavicons();
   await Bun.write(join(DIST, "song.schema.json"), `${JSON.stringify(songSchema(), null, 2)}\n`);
   await buildSongs();
   if (production) {
-    // Only the site names its own address and share image; the package's pages don't.
+    // Files only the site's root serves: hosts have their own robots.txt and sitemap.
     await buildImages("social");
-    await addSiteMetadata(DIST);
+    await addCrawlerFiles(DIST);
   }
 }
 

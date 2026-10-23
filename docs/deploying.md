@@ -18,15 +18,18 @@ and `player`, and environment `production`; page values are fixed at `/` and
 ## Search and sharing
 
 Each page's `<title>` and description live in its source (`packages/sequencer/index.html`
-and `packages/player/index.html`). The production build (`bun run build`) adds the rest
-from `scripts/build/siteMetadata.ts`, naming `https://dnbm.a2f0.net`: a canonical link
-(`/` and `/player/`, the forms the Worker serves without redirecting), Open Graph and
-Twitter tags, `WebSite` and `WebApplication` JSON-LD, `robots.txt`, and `sitemap.xml`,
-which lists the canonical link of every page in the build; a page without one fails the
-build, so add a new page to `SITE_PAGES`. The share image, `og-image.png`, is rendered
-from `assets/brand/logo.svg` by the `social` image target in `agent-tool.json`. Builds for
-development and the package leave all of this out. Unknown paths answer 404
-(`not_found_handling` is `none`), and there is no staging site.
+and `packages/player/index.html`). Every build adds the rest of each page's head from
+`scripts/build/siteMetadata.ts`, naming the fixed `https://dnbm.a2f0.net` URLs rather
+than the address a page is served from: a canonical link (`/` and `/player/`, the forms
+the Worker serves without redirecting), Open Graph and Twitter tags, and `WebSite` and
+`WebApplication` JSON-LD. The package's copies of the pages carry them too, so a host
+that serves them, such as a2f0.net at `/dnbm/`, presents a duplicate that names the site
+as canonical. Only the production build (`bun run build`) adds the site root's own files:
+`og-image.png`, the share image the tags name, rendered from `assets/brand/logo.svg` by
+the `social` image target in `agent-tool.json`; `robots.txt`; and `sitemap.xml`, which
+lists the canonical link of every page in the build. A page without one fails the build,
+so add a new page to `SITE_PAGES`. Unknown paths answer 404 (`not_found_handling` is
+`none`), and there is no staging site.
 
 ## Deploy by hand
 

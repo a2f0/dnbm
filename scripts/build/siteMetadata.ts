@@ -1,10 +1,11 @@
-// Search and sharing metadata for the standalone site at dnbm.a2f0.net, which only a
-// production build adds. Each page keeps its title and description in its own source
-// (packages/*/index.html); this adds what names the site's own addresses: a canonical
-// link, Open Graph and Twitter tags pointing at the share image (og-image.png, from the
-// "social" image target in agent-tool.json), JSON-LD, robots.txt, and a sitemap of the
-// pages' canonical URLs. The package's copy of the pages is built without production, so
-// a host serving them at its own address gets none of it.
+// Search and sharing metadata for dnbm.a2f0.net. Each page keeps its title and
+// description in its own source (packages/*/index.html). Every build of the pages adds
+// a canonical link, Open Graph and Twitter tags and JSON-LD, all naming the site's
+// production URLs and never the address a page is served from, so a host's copy of the
+// package's pages (a2f0.net/dnbm/, say) counts as a duplicate of the site. Only the
+// site's own production build adds what belongs at its root: the share image the tags
+// name (og-image.png, from the "social" image target in agent-tool.json), robots.txt,
+// and a sitemap of the pages' canonical URLs.
 
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
@@ -124,11 +125,10 @@ function sitemap(urls: readonly string[]): string {
 }
 
 /**
- * Adds each page's canonical link, shared tags and JSON-LD after its title, then writes
- * robots.txt and a sitemap listing the canonical link of every page in the build, so the
- * two can't disagree. A page in the build without one fails it.
+ * Adds each page's canonical link, shared tags and JSON-LD after its title. They name
+ * SITE_URL whatever builds or serves the page.
  */
-export async function addSiteMetadata(directory: string): Promise<void> {
+export async function addPageMetadata(directory: string): Promise<void> {
   for (const page of SITE_PAGES) {
     const file = join(directory, page.file);
     const html = await readFile(file, "utf8");
@@ -140,7 +140,13 @@ export async function addSiteMetadata(directory: string): Promise<void> {
     const end = marked.index + marked[0].length;
     await writeFile(file, `${html.slice(0, end)}${tags.join("")}${html.slice(end)}`);
   }
+}
 
+/**
+ * Writes the site root's robots.txt and a sitemap listing the canonical link of every
+ * page in the build, so the two can't disagree. A page in the build without one fails it.
+ */
+export async function addCrawlerFiles(directory: string): Promise<void> {
   const urls: string[] = [];
   for (const file of (await htmlFiles(directory)).sort()) {
     const canonical = /<link rel="canonical" href="([^"]+)"/.exec(await readFile(file, "utf8"));

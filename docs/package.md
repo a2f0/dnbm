@@ -20,10 +20,11 @@ engine and the example songs, along with the site's own pages and their favicons
 (`favicon.ico`, `favicon.svg` and `apple-touch-icon.png`; `icon.svg`, which the
 pages linked before 0.4.8, is still there). The pages link the favicons relative to
 themselves, so a copy served from any path shows them; mounting an app into a host
-page leaves the host's own favicon alone. The pages carry none of dnbm.a2f0.net's
-canonical links, sharing tags, share image, `robots.txt` or sitemap, which only the
-site's own build adds. Copy them into a directory your host serves, from a Node 22+ or
-Bun build script:
+page leaves the host's own favicon alone. The pages' canonical links and sharing tags
+name dnbm.a2f0.net, wherever a copy is served, so search engines treat a host's copy as
+a duplicate of the site; the site's `robots.txt`, sitemap and share image aren't
+included. Copy them into a directory your host serves, from a Node 22+ or Bun build
+script:
 
 ```ts
 import { copyDnbmAssets } from "@a2f0/dnbm/build";
