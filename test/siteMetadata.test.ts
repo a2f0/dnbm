@@ -4,7 +4,7 @@
 // test/package.test.ts checks that the package's pages name the same canonical URLs and
 // leave out the site root's files.
 
-import { beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -105,11 +105,7 @@ describe("the production site's metadata", () => {
     expect(await readFile(join(DIST, "_headers"), "utf8")).not.toMatch(/x-robots-tag/i);
   });
 
-  test("unknown paths get a noindexed 404 page that links to the site's pages", async () => {
-    // Cloudflare answers a path it has no file for with the 404 page and status 404.
-    expect(await readFile(join(ROOT, "wrangler.jsonc"), "utf8")).toMatch(
-      /"not_found_handling":\s*"404-page"/,
-    );
+  test("the 404 page is noindexed and links to the site's pages", async () => {
     const html = await readFile(join(DIST, NOT_FOUND_PAGE), "utf8");
     expect(/<title>([^<]+)<\/title>/.exec(html)?.[1]).toEndWith(" · dnbm");
     expect(content(html, "name", "robots")).toEqual(["noindex"]);
@@ -128,6 +124,118 @@ describe("the production site's metadata", () => {
     }
   });
 });
+
+// The production build as Cloudflare serves it: `wrangler dev` runs the Worker in workerd
+// with wrangler.jsonc's asset handling and _headers, which a test server can't stand in for.
+describe("the production site on the Workers runtime", () => {
+  let worker: Awaited<ReturnType<typeof startWorker>> | undefined;
+
+  beforeAll(async () => {
+    await buildWeb(true);
+    worker = await startWorker();
+  }, 60_000);
+
+  afterAll(async () => {
+    await worker?.stop();
+  }, 15_000);
+
+  async function get(path: string): Promise<Response> {
+    if (!worker) throw new Error("the Worker didn't start");
+    return await fetch(new URL(path, worker.url), { redirect: "manual" });
+  }
+
+  test("answers unknown paths at any depth with the 404 page and the site's headers", async () => {
+    const page = await readFile(join(DIST, NOT_FOUND_PAGE), "utf8");
+    for (const path of ["/missing", "/player/missing", "/a/b/c", "/songs/missing.dnbm.json"]) {
+      const response = await get(path);
+      expect([path, response.status]).toEqual([path, 404]);
+      expect(response.headers.get("content-type")).toStartWith("text/html");
+      expect(response.headers.get("content-security-policy")).toContain("default-src 'self'");
+      expect(response.headers.get("x-robots-tag")).toBeNull();
+      expect(await response.text()).toBe(page);
+    }
+  });
+
+  test("serves the pages and crawler files directly, and keeps /404 out of search", async () => {
+    for (const page of SITE_PAGES) expect((await get(page.path)).status).toBe(200);
+    for (const file of ["robots.txt", "sitemap.xml", SHARE_IMAGE.path]) {
+      expect((await get(`/${file}`)).status).toBe(200);
+    }
+    // Cloudflare redirects the page's own file to /404 and answers that with 200, so the
+    // page's noindex is what keeps it out of search.
+    expect((await get(`/${NOT_FOUND_PAGE}`)).headers.get("location")).toBe("/404");
+    const own = await get("/404");
+    expect(own.status).toBe(200);
+    expect(content(await own.text(), "name", "robots")).toEqual(["noindex"]);
+  });
+});
+
+/** Starts `wrangler dev` on the build, and resolves once it serves. */
+async function startWorker(): Promise<{ url: URL; stop: () => Promise<void> }> {
+  const state = await mkdtemp(join(tmpdir(), "dnbm-wrangler-"));
+  const child = Bun.spawn(
+    [
+      "node",
+      join(ROOT, "node_modules", "wrangler", "bin", "wrangler.js"),
+      "dev",
+      "--config",
+      join(ROOT, "wrangler.jsonc"),
+      "--local",
+      "--ip",
+      "127.0.0.1",
+      "--port",
+      "0",
+      "--inspector-port",
+      "0",
+      "--persist-to",
+      state,
+      "--show-interactive-dev-session=false",
+    ],
+    {
+      cwd: ROOT,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, WRANGLER_SEND_METRICS: "false", WRANGLER_LOG_PATH: state },
+    },
+  );
+  const stop = async () => {
+    child.kill("SIGTERM");
+    const exited = await Promise.race([child.exited, Bun.sleep(10_000).then(() => undefined)]);
+    if (exited === undefined) {
+      child.kill("SIGKILL");
+      await child.exited;
+    }
+    await rm(state, { recursive: true, force: true });
+  };
+  let output = "";
+  const ready = Promise.withResolvers<URL>();
+  // Keeps reading both streams, so wrangler never blocks on a full pipe.
+  const read = async (stream: ReadableStream<Uint8Array>) => {
+    const decoder = new TextDecoder();
+    for await (const chunk of stream) {
+      output += decoder.decode(chunk, { stream: true });
+      const address = /Ready on (http:\/\/127\.0\.0\.1:\d+)/.exec(Bun.stripANSI(output));
+      if (address?.[1]) ready.resolve(new URL(address[1]));
+    }
+  };
+  void read(child.stdout);
+  void read(child.stderr);
+  void child.exited.then((code) =>
+    ready.reject(new Error(`wrangler dev exited with ${code}:\n${output}`)),
+  );
+  const timeout = setTimeout(
+    () => ready.reject(new Error(`wrangler dev didn't start in 45 seconds:\n${output}`)),
+    45_000,
+  );
+  try {
+    return { url: await ready.promise, stop };
+  } catch (error) {
+    await stop();
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 describe("the sitemap", () => {
   test("leaves out noindexed pages, and fails on another page without a canonical link", async () => {

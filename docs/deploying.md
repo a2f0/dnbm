@@ -32,7 +32,9 @@ lists the canonical link of every page in the build; and `404.html`
 a new page to `SITE_PAGES`; only a page marked `noindex`, as the 404 page is, stays out
 of the sitemap. Unknown paths answer 404 with that page (`not_found_handling` is
 `404-page`), which links to the sequencer and the player; `/404` itself answers 200, and
-its `noindex` keeps it out of search. There is no staging site.
+its `noindex` keeps it out of search. `bun run dev` answers missing paths with the same
+page, and `test/siteMetadata.test.ts` checks the production build's answers under
+`wrangler dev`, the Workers runtime. There is no staging site.
 
 The sequencer's page title names the open song once the app loads, as
 "Undertow · Drum and Bass Sequencer · dnbm", so a crawler that runs the script still

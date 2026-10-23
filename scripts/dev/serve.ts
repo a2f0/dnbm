@@ -2,14 +2,17 @@
 // packages/synth/engine/ changes, the pages otherwise (including the shell in src/,
 // which both pages' scripts bundle, and the favicons' sources in assets/brand/).
 // Responses carry the production headers from packages/sequencer/_headers, so the
-// content security policy is exercised locally too.
+// content security policy is exercised locally too, and a missing path gets the site's
+// 404 page with status 404, as Cloudflare answers it.
 // AudioWorklet needs a secure context: localhost is one, file:// pages are not.
 
 import { watch } from "node:fs";
 import { extname, join, normalize } from "node:path";
-import { build, buildEngine, buildWeb, DIST, ROOT } from "../build/build";
+import { build, buildEngine, buildWeb, DIST, NOT_FOUND_PAGE, ROOT } from "../build/build";
 
 const port = Number(process.env["PORT"] ?? 8174);
+// Only the production build copies it into dist/, so serve it from its source.
+const NOT_FOUND = join(ROOT, "packages", "sequencer", NOT_FOUND_PAGE);
 
 /** The headers packages/sequencer/_headers sets for every path ("/*"). */
 async function siteHeaders(): Promise<Record<string, string>> {
@@ -39,7 +42,10 @@ const server = Bun.serve({
     const file = Bun.file(join(DIST, name));
     return (await file.exists())
       ? new Response(file, { headers })
-      : new Response("Not found", { status: 404, headers });
+      : new Response(Bun.file(NOT_FOUND), {
+          status: 404,
+          headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+        });
   },
 });
 
