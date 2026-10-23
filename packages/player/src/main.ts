@@ -3,8 +3,8 @@
 // plays the songs its URL names (`?song=<url>`, repeated), or every example song.
 // `?embed` shows it as a host would, filling the page without the wordmark.
 
+import { createSiteTracker } from "@a2f0/dnbm-synth/standalone/tracking";
 import { mountApp, PLAYER } from "../../../src/shell";
-import { createSiteTracker } from "../../synth/src/siteTracking";
 
 const params = new URLSearchParams(location.search);
 const songs = params.getAll("song").map((song) => new URL(song, document.baseURI).href);

@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import type { ClickEvent } from "@a2f0/ct-client";
+import { createSiteTracker } from "@a2f0/dnbm-synth/standalone/tracking";
 import { type Browser, chromium, type Page } from "playwright-core";
-import { createSiteTracker } from "../packages/synth/src/siteTracking";
 import { buildWeb, DIST, ROOT } from "../scripts/build";
 
 const ORIGIN = "https://dnbm.a2f0.net";
@@ -26,7 +26,7 @@ describe("standalone click tracking", () => {
   const headers: Record<string, string> = {};
 
   beforeAll(async () => {
-    await buildWeb();
+    await buildWeb(true);
     for (const line of (await Bun.file(join(DIST, "_headers")).text()).split("\n")) {
       const match = /^\s+([\w-]+):\s*(.+)$/.exec(line);
       if (match?.[1] && match[2]) headers[match[1]] = match[2];
@@ -100,11 +100,13 @@ describe("standalone click tracking", () => {
     return { context, page, batches, problems };
   }
 
-  async function flush(page: Page): Promise<void> {
+  async function flush(page: Page, expectBatch = false): Promise<void> {
+    const sent = expectBatch ? page.waitForResponse(COLLECTOR) : undefined;
     await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")));
     // The synthetic lifecycle event flushes real Playwright mouse clicks. It
     // does not synthesize click events, which CT deliberately rejects.
-    await page.waitForTimeout(150);
+    if (sent) await sent;
+    else await page.waitForTimeout(150);
   }
 
   test("importing and constructing outside a built browser entrypoint stays inert", () => {
@@ -126,7 +128,7 @@ describe("standalone click tracking", () => {
           await page.locator("input.title").fill("private song title");
           await page.locator("input.title").click();
         }
-        await flush(page);
+        await flush(page, true);
         expect(batches).toHaveLength(1);
         expect(batches[0]).toMatchObject({ site: "dnbm", environment: "production" });
         const events = batches.flatMap((batch) => batch.events);

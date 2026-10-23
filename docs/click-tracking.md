@@ -16,7 +16,7 @@ region and city when available. Location is approximate, not GPS. Clicks are
 retained for 90 days and viewable only through the authenticated CT admin dashboard
 and data API. Registration is disabled; administrators are provisioned by CLI.
 
-This site explicitly overrides Global Privacy Control. Do Not Track, the CT
+The site owner has configured DNBM to override Global Privacy Control. Do Not Track, the CT
 browser extension and the site's saved CT opt-out still stop collection. To opt
 out for this origin without the extension, set `ct:opt-out` to `1` in local storage
 and reload. Removing that setting restores the default. CT stores no visitor

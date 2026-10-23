@@ -101,7 +101,7 @@ async function bundle(entrypoints: string[], outdir: string, production: boolean
   if (!result.success) throw new AggregateError(result.logs, "Web build failed");
 }
 
-export async function buildWeb(production = true): Promise<void> {
+export async function buildWeb(production = false): Promise<void> {
   await bundle(
     [
       join(SEQUENCER, "src", "main.ts"),
@@ -123,7 +123,7 @@ export async function buildWeb(production = true): Promise<void> {
   await buildSongs();
 }
 
-export async function build(production = true): Promise<void> {
+export async function build(production = false): Promise<void> {
   await rm(DIST, { recursive: true, force: true });
   await buildEngine();
   await buildWeb(production);
@@ -134,7 +134,7 @@ if (import.meta.main) {
     await buildEngine();
     console.info(`Built ${ENGINE_WASM}`);
   } else {
-    await build();
+    await build(true);
     console.info(`Built ${DIST}`);
   }
 }

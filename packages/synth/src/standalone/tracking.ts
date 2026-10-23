@@ -17,6 +17,7 @@ export function createSiteTracker(app: "sequencer" | "player"): Tracker | undefi
     app,
     environment: "production",
     capture: "all",
+    // The standalone site's configured preference; all other CT opt-outs remain active.
     overrideGpc: true,
     page: () => (app === "player" ? "/player" : "/"),
   });

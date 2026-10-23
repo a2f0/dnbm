@@ -69,8 +69,9 @@ rendering and lazy loading are safe.
 
 The mount functions and app modules never initialize click tracking. Tracking on
 the standalone dnbm site starts only in its page entrypoints, in a production
-build on `https://dnbm.a2f0.net`. A host such as a2f0.net owns its own tracking, so
-embedding either app adds no tracker or duplicate events.
+build on `https://dnbm.a2f0.net`. Packaged page assets disable tracking too. A host
+such as a2f0.net owns its own tracking, so embedding either app adds no tracker or
+duplicate events.
 
 Audio starts on the first press inside the app, or on a command the host runs from
 a press, as browsers require. The app takes the keyboard only while focus is inside

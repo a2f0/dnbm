@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./audio/*": "./src/audio/*.ts",
-    "./song/*": "./src/song/*.ts"
+    "./song/*": "./src/song/*.ts",
+    "./standalone/*": "./src/standalone/*.ts"
   }
 }

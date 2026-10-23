@@ -2,8 +2,8 @@
 // (src/shell.ts) and app module, from the assets beside this script. `?embed` shows it
 // as a host would, without the wordmark.
 
+import { createSiteTracker } from "@a2f0/dnbm-synth/standalone/tracking";
 import { mountApp, SEQUENCER } from "../../../src/shell";
-import { createSiteTracker } from "../../synth/src/siteTracking";
 
 const container = document.getElementById("app");
 if (container) {
