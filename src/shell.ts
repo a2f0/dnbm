@@ -63,7 +63,10 @@ export interface AppContext {
   readonly actions?: boolean | undefined;
   /** The player's playlist, as absolute URLs; undefined for every example song. */
   readonly songs?: readonly string[] | undefined;
-  /** Receives the title the app gives its page as it changes, as "● Undertow · dnbm". */
+  /**
+   * Receives the title the app gives its page as it changes, as
+   * "● Undertow · Drum and Bass Sequencer · dnbm".
+   */
   readonly onTitle?: ((title: string) => void) | undefined;
   /**
    * Receives the app's state (`DnbmSequencerState` or `DnbmPlayerState`) whenever it may

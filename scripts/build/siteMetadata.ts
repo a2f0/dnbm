@@ -5,7 +5,7 @@
 // package's pages (a2f0.net/dnbm/, say) counts as a duplicate of the site. Only the
 // site's own production build adds what belongs at its root: the share image the tags
 // name (og-image.png, from the "social" image target in agent-tool.json), robots.txt,
-// and a sitemap of the pages' canonical URLs.
+// and a sitemap of the pages' canonical URLs, which leaves out the noindexed 404 page.
 
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
@@ -142,14 +142,22 @@ export async function addPageMetadata(directory: string): Promise<void> {
   }
 }
 
+/** Whether a built page asks search engines not to index it, as the 404 page does. */
+function noindex(html: string): boolean {
+  return /<meta\s+name="robots"\s+content="[^"]*\bnoindex\b/.test(html);
+}
+
 /**
  * Writes the site root's robots.txt and a sitemap listing the canonical link of every
- * page in the build, so the two can't disagree. A page in the build without one fails it.
+ * page in the build, so the two can't disagree. A page in the build without one fails it,
+ * unless it is marked noindex, like the 404 page, which the sitemap leaves out.
  */
 export async function addCrawlerFiles(directory: string): Promise<void> {
   const urls: string[] = [];
   for (const file of (await htmlFiles(directory)).sort()) {
-    const canonical = /<link rel="canonical" href="([^"]+)"/.exec(await readFile(file, "utf8"));
+    const html = await readFile(file, "utf8");
+    if (noindex(html)) continue;
+    const canonical = /<link rel="canonical" href="([^"]+)"/.exec(html);
     const name = relative(directory, file).split(sep).join("/");
     if (!canonical?.[1]) throw new Error(`${name} has no canonical link: add it to SITE_PAGES`);
     urls.push(unescapeAttribute(canonical[1]));

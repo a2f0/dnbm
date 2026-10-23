@@ -250,7 +250,10 @@ export class App {
     this.mixer.update(song, view);
     const dirty = this.store.dirty;
     this.fileLabel.textContent = `${dirty ? "● " : ""}${this.currentFileName()}`;
-    this.environment.onTitle?.(`${dirty ? "● " : ""}${song.title} · dnbm`);
+    // The song leads, and the rest still says what the page is, as its static title does.
+    this.environment.onTitle?.(
+      `${dirty ? "● " : ""}${song.title} · Drum and Bass Sequencer · dnbm`,
+    );
     this.publish(dirty);
   }
 
