@@ -16,7 +16,7 @@
     "audioworklet"
   ],
   "type": "module",
-  "packageManager": "bun@1.4.3",
+  "packageManager": "bun@1.4.4",
   "workspaces": [
     "packages/*"
   ],
@@ -82,11 +82,11 @@
     "@a2f0/agent-tool": "0.1.21",
     "@a2f0/ct-client": "0.1.5",
     "@a2f0/dnbm-synth": "workspace:*",
-    "@biomejs/biome": "2.6.2",
+    "@biomejs/biome": "2.6.3",
     "@tsconfig/strictest": "2.0.8",
-    "@types/bun": "1.4.3",
+    "@types/bun": "1.4.4",
     "playwright-core": "1.64.1",
     "typescript": "7.0.2",
-    "wrangler": "4.151.3"
+    "wrangler": "4.153.0"
   }
 }
