@@ -17,6 +17,17 @@ import type {
 } from "../src/index";
 
 const ROOT = join(import.meta.dir, "..");
+// Chrome's graceful process exit alone can take five seconds on macOS.
+const BROWSER_TEARDOWN_TIMEOUT = 15_000;
+
+async function closeBrowser(browser: Browser | undefined): Promise<void> {
+  if (!browser) return;
+  try {
+    await Promise.all(browser.contexts().map((context) => context.close()));
+  } finally {
+    await browser.close();
+  }
+}
 
 interface Packed {
   readonly filename: string;
@@ -555,9 +566,12 @@ describe("the packaged app mounted in a host page", () => {
   }, 60_000);
 
   afterAll(async () => {
-    await browser?.close();
-    await server?.stop(true);
-  });
+    try {
+      await closeBrowser(browser);
+    } finally {
+      await server?.stop(true);
+    }
+  }, BROWSER_TEARDOWN_TIMEOUT);
 
   test("mounts in a shadow root, ready once it shows, embedded without the wordmark", async () => {
     expect(await page.locator("iframe").count()).toBe(0);
@@ -1395,9 +1409,12 @@ describe("the packaged app driven by its host's controls", () => {
   }, 60_000);
 
   afterAll(async () => {
-    await browser?.close();
-    await server?.stop(true);
-  });
+    try {
+      await closeBrowser(browser);
+    } finally {
+      await server?.stop(true);
+    }
+  }, BROWSER_TEARDOWN_TIMEOUT);
 
   /**
    * Presses the host's own button, which runs `command` on an app as a host's menu item
@@ -2006,9 +2023,12 @@ describe("the packaged app with its assets on another origin", () => {
   }, 60_000);
 
   afterAll(async () => {
-    await browser?.close();
-    for (const server of servers) await server.stop(true);
-  });
+    try {
+      await closeBrowser(browser);
+    } finally {
+      await Promise.all(servers.map((server) => server.stop(true)));
+    }
+  }, BROWSER_TEARDOWN_TIMEOUT);
 
   test("plays, and exports a WAV through its worker", async () => {
     const sequencer = page.locator("#window");
@@ -2080,9 +2100,12 @@ describe("the packaged site's own pages", () => {
   }, 60_000);
 
   afterAll(async () => {
-    await browser?.close();
-    await server?.stop(true);
-  });
+    try {
+      await closeBrowser(browser);
+    } finally {
+      await server?.stop(true);
+    }
+  }, BROWSER_TEARDOWN_TIMEOUT);
 
   /** Opens a page, collecting errors and content security policy violations. */
   async function open(path: string): Promise<{ page: Page; problems: string[] }> {

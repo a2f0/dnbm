@@ -8,7 +8,7 @@ workspace lockfile; `.mise.toml` pins controller tools, and
 
 ## Lockfile regeneration
 
-Bun 1.4.3 writes lockfile format 3 when the manifest has nested overrides, and
+Bun 1.4.4 writes lockfile format 3 when the manifest has nested overrides, and
 normalizes it to format 2 after they are removed. A lower format number alone
 therefore does not show that an older runtime generated it. Let the pinned Bun
 [regenerate the lockfile](https://bun.com/docs/pm/lockfile), then verify
