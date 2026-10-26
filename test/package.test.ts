@@ -554,10 +554,14 @@ describe("the packaged app mounted in a host page", () => {
     player = page.locator("#player");
   }, 60_000);
 
+  // Chrome can take five seconds to exit on macOS, beyond the page's cleanup.
+  // Keep a separate bounded teardown budget; application test deadlines stay unchanged.
   afterAll(async () => {
+    // Release the page's audio and download resources before shutting down Chrome.
+    await page?.context().close();
     await browser?.close();
     await server?.stop(true);
-  });
+  }, 15_000);
 
   test("mounts in a shadow root, ready once it shows, embedded without the wordmark", async () => {
     expect(await page.locator("iframe").count()).toBe(0);
@@ -1394,10 +1398,14 @@ describe("the packaged app driven by its host's controls", () => {
     player = page.locator("#player");
   }, 60_000);
 
+  // Chrome can take five seconds to exit on macOS, beyond the page's cleanup.
+  // Keep a separate bounded teardown budget; application test deadlines stay unchanged.
   afterAll(async () => {
+    // Release the page's audio and download resources before shutting down Chrome.
+    await page?.context().close();
     await browser?.close();
     await server?.stop(true);
-  });
+  }, 15_000);
 
   /**
    * Presses the host's own button, which runs `command` on an app as a host's menu item
