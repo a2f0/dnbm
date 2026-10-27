@@ -3,9 +3,9 @@
 | Path                  | What                                                                                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/synth/`     | The shared synthesizer: the Rust audio engine (`engine/`), its AudioWorklet host, and the song format                                 |
-| `packages/sequencer/` | The editor and mixer (TypeScript and DOM)                                                                                             |
+| `packages/sequencer/` | The editor and mixer (TypeScript and DOM); see [its README](../packages/sequencer/README.md)                                          |
 | `src/`                | The npm package's entrypoints (`mountDnbm`, `mountDnbmPlayer`, `copyDnbmAssets`), and the shell that mounts an app into a shadow root |
-| `packages/player/`    | A playlist player that plays songs through the same synthesizer                                                                       |
+| `packages/player/`    | A playlist player that plays songs through the same synthesizer; see [its README](../packages/player/README.md)                       |
 | `test/`               | Repository-wide tests: the packed npm package, and the greys-only rule                                                                |
 | `songs/`              | Example songs                                                                                                                         |
 | `assets/brand/`       | The brand mark (`logo.svg`); the build renders the site's favicons from it (`favicons` in `agent-tool.json`)                          |
@@ -73,8 +73,9 @@ name explicitly, so detached checkouts do not need to be changed to inspect a na
 
 ## Documentation and releases
 
-README covers the product, setup, and everyday commands. Keep application design
-in [architecture](architecture.md), embedding and npm releases in
+README covers the product, setup, and everyday commands, and the sequencer's and
+player's READMEs cover using each app. Keep application design in
+[architecture](architecture.md), embedding and npm releases in
 [package](package.md), site operations in [deploying](deploying.md), and active
 upgrade constraints in [dependency maintenance](dependency-upgrades.md).
 Update those guides alongside their commands. Validation/review evidence for one
