@@ -1,9 +1,10 @@
 # dnbm
 
-A dark drum and bass sequencer and mixer in the browser, at
-[dnbm.a2f0.net](https://dnbm.a2f0.net). Program patterns on a step grid, arrange them
-into a song, mix them with per-track filters, drive and sends, and save songs as plain
-text that diffs and merges cleanly in Git.
+A dark drum and bass sequencer and mixer in the browser. Program patterns on a step
+grid, arrange them into a song, mix them with per-track filters, drive and sends, and
+save songs as plain text that diffs and merges cleanly in Git.
+This repo is available on the web at <https://dnbm.a2f0.net>. Its player, at
+<https://dnbm.a2f0.net/player/>, plays the example songs as a playlist.
 
 The sound comes from a Rust engine compiled to WebAssembly and run in an AudioWorklet.
 Every drum and bass sound is synthesized, not sampled; steps land on the exact sample
@@ -13,42 +14,31 @@ the browser, in an export and from the command line.
 The standalone site uses [CT click tracking](docs/click-tracking.md). Embedded apps
 leave tracking to their host.
 
-## Run it
+## Quick start
+
+Install [mise](https://mise.jdx.dev/) and [rustup](https://rustup.rs); rustup installs
+the toolchain and WebAssembly target pinned in `rust-toolchain.toml` on first use.
 
 ```sh
 mise install                      # Bun, Node, ShellCheck and wasm-opt (see .mise.toml)
 bun install
 bun run hooks:install             # once per clone
-bun run dev                       # http://localhost:8174
+bun run dev                       # http://localhost:8174 (player: /player/)
 ```
 
-Rust comes from [rustup](https://rustup.rs), which installs the toolchain and
-WebAssembly target pinned in `rust-toolchain.toml` on first use.
+The editor opens on the example song Undertow; press space to play.
 
-The editor opens on **Undertow**, a 172 BPM roller in F minor: syncopated sub and
-reese bass, dry backbeats, ghost snares and sparse, filtered dub echoes. Its 36 bars
-move from a short intro through four-bar variations, a half-time break and a heavier
-return. Press space to play. The browser restores your last session; choose
-Undertow from **examples** to reload the bundled song. The same menu holds ten
-darker songs, from Bathyal's slow pressure and Oubliette's bare cell to Corrosion's
-industrial grind and Sever's techstep cuts, each longer than Undertow and all built
-from the same synthesized kit: drones and stabs come from the `pad` instrument,
-detuned saw pairs an interval apart under a slow, resonant filter.
+## Layout
 
-Click an arrangement slot to start there, or choose **loop** to work on one pattern.
-**follow** keeps the grid on the playing pattern; selecting another pattern during
-song playback turns follow off so you can edit ahead. Muted channels and channels
-excluded by solo dim in the mixer. The master holds its highest peak in dBFS; click
-that reading to reset it, or start playback for a fresh reading.
+| Path                  | What                                                                               |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `packages/sequencer/` | [The editor and mixer](packages/sequencer/README.md), served at the site's root    |
+| `packages/player/`    | [The playlist player](packages/player/README.md), served at `/player/`             |
+| `packages/synth/`     | The shared synthesizer: the Rust engine, its AudioWorklet host and the song format |
+| `src/`                | The entrypoints of the `@a2f0/dnbm` package                                        |
+| `songs/`              | The example songs                                                                  |
 
-## Player
-
-[dnbm.a2f0.net/player/](https://dnbm.a2f0.net/player/) plays the example songs as a
-playlist, after the desktop players of old: elapsed or remaining time, a spectrum,
-seek, shuffle, repeat and volume, with Z, X, C, V and B for previous, play, pause, stop
-and next. It plays through the same engine as the editor and edits nothing. Other pages
-embed it with `mountDnbmPlayer` from the package, passing any list of song files as
-the playlist.
+[Architecture](docs/architecture.md) describes how the packages fit together.
 
 ## Songs
 
@@ -72,6 +62,15 @@ bun run render songs/undertow.dnbm.json   # render to undertow.wav (24-bit, 48 k
 bun run songs:fmt                         # rewrite songs/ canonically
 bun run songs:check                       # fail on an invalid or non-canonical song
 ```
+
+The example songs in `songs/` open from the editor's **examples** menu, and the player
+plays them all. **Undertow** is a 172 BPM roller in F minor: syncopated sub and reese
+bass, dry backbeats, ghost snares and sparse, filtered dub echoes. Its 36 bars move from
+a short intro through four-bar variations, a half-time break and a heavier return. Ten
+darker songs, from Bathyal's slow pressure and Oubliette's bare cell to Corrosion's
+industrial grind and Sever's techstep cuts, are each longer than Undertow and all built
+from the same synthesized kit: drones and stabs come from the `pad` instrument, detuned
+saw pairs an interval apart under a slow, resonant filter.
 
 ## Package
 
@@ -110,4 +109,4 @@ bun run fix     # format TypeScript, Rust and songs
 See [development](docs/development.md) for layout, script ownership and validation,
 [package releases](docs/package.md#releases) for publishing, and
 [dependency maintenance](docs/dependency-upgrades.md) for upgrade procedures
-and active constraints. Coding agents follow [`AGENTS.md`](AGENTS.md).
+and active constraints.

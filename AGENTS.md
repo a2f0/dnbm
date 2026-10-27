@@ -14,10 +14,12 @@ no framework:
 The workspace packages are private; the root `package.json` is the published
 `@a2f0/dnbm`, whose two entrypoints are in `src/` with the shell (`src/shell.ts`) that
 mounts an app into a shadow root in a host's document and the commands and state each
-app offers its host (`src/control.ts`), and the build bundles the synth into each app. `README.md` gives the
-overview and `docs/` the detail: [song format](docs/song-format.md),
-[architecture](docs/architecture.md), [package](docs/package.md),
-[deploying](docs/deploying.md), [development](docs/development.md).
+app offers its host (`src/control.ts`), and the build bundles the synth into each app.
+`README.md` gives the overview, `packages/sequencer/README.md` and
+`packages/player/README.md` how to use each app, and `docs/` the detail:
+[song format](docs/song-format.md), [architecture](docs/architecture.md),
+[package](docs/package.md), [deploying](docs/deploying.md),
+[development](docs/development.md).
 
 ## Setup
 
