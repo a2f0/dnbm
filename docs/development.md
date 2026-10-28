@@ -42,8 +42,8 @@ uses the pinned rustup toolchain and `wasm-opt` from `.mise.toml`.
 through agent-tool. It prints a structured report with per-step logs and source
 fingerprints; `bun run agent-tool runs list --head <commit>` finds stored receipts.
 A failed command or changed source fails the group. Keep this report visible.
-Use the pinned capture harness for other noisy finite commands as described in
-AGENTS.md. Interactive `bun run dev` runs directly. Check UI changes in a real
+Capture other noisy finite commands as [output capture](../AGENTS.md#output-capture)
+describes. Interactive `bun run dev` runs directly. Check UI changes in a real
 browser, and use `bun run render <song>` to inspect audio changes offline.
 
 ## Git hooks

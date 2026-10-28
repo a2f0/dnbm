@@ -40,15 +40,6 @@ host pages in Google Chrome (through `playwright-core`), with the assets on the 
 origin and on another, and loads the site's own pages under its content security
 policy, so checks need Chrome installed, as GitHub's runners have.
 
-Capture noisy finite commands with the pinned harness, for example
-`bun run agent:run --label tests -- bun run test`. It preserves exit status and
-full private logs while returning a compact receipt and a bounded failure excerpt.
-Use `bun run agent-tool logs <log-path>` or a targeted search for more evidence;
-inspect required warnings, timings, and artifacts before accepting a check.
-`bun run check` already captures each step and prints a durable run-group report;
-run it directly so its structured evidence stays visible. Keep review verdicts
-and structured decision output visible. Do not wrap interactive tools or persistent servers.
-
 While iterating:
 
 ```sh
@@ -64,6 +55,23 @@ bun run dev                          # http://localhost:8174 (player: /player/),
 
 Check UI changes in a browser as well as in tests. `bun run render <song>` renders a
 song with the same engine, for checking sound changes offline.
+
+## Output capture
+
+Run finite, noisy commands, such as installs, builds, tests, linters, and Git commands
+that run hooks, through `bun run agent:run --label <name> -- <command> [args...]`, for
+example `bun run agent:run --label tests -- bun run test`. It keeps complete output in
+a private log, preserves the exit status, and prints a compact receipt, with a bounded
+excerpt of the log on failure. Read more with `bun run agent:logs <log-path>`, raising
+`--tail-lines` or `--max-bytes` as needed, or with a targeted search of the log. A zero
+exit does not rule out warnings: inspect required warnings, timings, and artifacts
+before accepting a check. Run reviews, version preparation, audits, infrastructure
+previews, and run-group checks directly so their results stay visible, and run
+interactive tools and servers directly too. Never narrow a suite or silence warnings to
+reduce output.
+
+`bun run check` is a run group: it already captures each step and prints a durable
+run-group report, so run it directly to keep its structured evidence visible.
 
 ## Conventions
 
