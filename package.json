@@ -49,6 +49,7 @@
   },
   "scripts": {
     "agent-tool": "agent-tool",
+    "agent:logs": "agent-tool logs",
     "agent:run": "agent-tool run",
     "agents:check": "agent-tool skills check",
     "agents:sync": "agent-tool skills install --apply",
