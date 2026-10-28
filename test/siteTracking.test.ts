@@ -44,6 +44,15 @@ describe("standalone click tracking", () => {
     browser = await chromium.launch({ channel: "chrome", headless: true });
   }, 60_000);
 
+  // The first page a newly launched Chrome loads pays its cold start, which on CI
+  // runners takes several seconds, close to or past Bun's 5 s default for each test,
+  // while every later page loads in under a second. Load one page here, in a context
+  // of its own and with its own budget, so no test depends on which one runs first.
+  beforeAll(async () => {
+    const { context } = await open("/");
+    await context.close();
+  }, 30_000);
+
   afterAll(async () => {
     await browser?.close();
     await server?.stop(true);
