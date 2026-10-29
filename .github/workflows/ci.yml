@@ -57,7 +57,7 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Check agent skills
+      - name: Check agent skills and permissions
         run: bun run agents:check
 
       - name: Audit dependencies

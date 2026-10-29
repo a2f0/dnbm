@@ -20,16 +20,18 @@ stable for people, hooks, and CI: `build`, `build:engine`, `build:package`, `dev
 The [script directory](../scripts/README.md) groups implementation by purpose;
 application code and engine-specific tooling stay in their packages.
 
-Shared Git/GitHub workflow mechanics and managed skills come from the exact-pinned
-agent-tool dependency. Repository policy lives in `agent-tool.json`; do not copy
-shared algorithms into new local scripts or edit generated skills. Follow
-[AGENTS.md](../AGENTS.md) for review, versioning, and shipping requirements.
+Shared Git/GitHub workflow mechanics, managed skills, and harness permission rules
+come from the exact-pinned agent-tool dependency. Repository policy lives in
+`agent-tool.json`; do not copy shared algorithms into new local scripts or edit
+generated skills or rules. Follow [AGENTS.md](../AGENTS.md) for review, versioning,
+and shipping requirements.
 
 ## Validation
 
 `bun run check` runs the complete local gate: binary-file policy, ShellCheck,
-Biome, canonical songs, TypeScript, shared skills, Rust formatting/clippy/tests,
-the WebAssembly/site build, all Bun tests, and a Wrangler deployment dry run.
+Biome, canonical songs, TypeScript, shared skills and permission rules,
+Rust formatting/clippy/tests, the WebAssembly/site build, all Bun tests, and a
+Wrangler deployment dry run.
 The pre-push hook also validates pushed branches and commit trust before this gate.
 Run `bun audit` separately; CI's lint job requires it too.
 

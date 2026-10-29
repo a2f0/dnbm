@@ -45,7 +45,8 @@ While iterating:
 ```sh
 bun run engine:check                 # rustfmt, clippy -D warnings, cargo test
 bun run test                         # build the engine, then bun test
-bun run typecheck && bunx biome ci   # TypeScript and Biome
+bun run typecheck                    # TypeScript
+bun run agent-tool bun x biome -- ci # Biome
 bun audit                            # package security advisories
 bun run songs:check                  # songs are valid and canonical
 bun run lint:binary-files            # no binary files since upstream (or pass --staged, --all)
@@ -58,10 +59,12 @@ song with the same engine, for checking sound changes offline.
 
 ## Output capture
 
-Run finite, noisy commands, such as installs, builds, tests, linters, and Git commands
-that run hooks, through `bun run agent:run --label <name> -- <command> [args...]`, for
-example `bun run agent:run --label tests -- bun run test`. It keeps complete output in
-a private log, preserves the exit status, and prints a compact receipt, with a bounded
+Run Bun tests through `bun run agent-tool bun test --log [-- args...]` once
+`bun run build:engine` has built the engine, and other finite, noisy commands, such as
+installs, builds, linters, package scripts, and Git commands that run hooks, through
+`bun run agent:run --label <name> -- <command> [args...]`, for example
+`bun run agent:run --label engine -- bun run build:engine`. Each keeps complete output
+in a private log, preserves the exit status, and prints a compact receipt, with a bounded
 excerpt of the log on failure. Read more with `bun run agent:logs <log-path>`, raising
 `--tail-lines` or `--max-bytes` as needed, or with a targeted search of the log. A zero
 exit does not rule out warnings: inspect required warnings, timings, and artifacts
@@ -140,10 +143,14 @@ with a short maintenance link; do not append upgrade reports there.
 PR workflows come from the `@a2f0/agent-tool` dev dependency: use `open-pr` to open a
 PR and `ship-pr` to ship one end to end (independent review, repairs, merge, cleanup).
 Run them with `bun run agent-tool ...`. Do not edit the managed skill copies in
-`.agents/skills` and `.claude/skills`; after upgrading the dependency, run
-`bun run agents:sync` and commit the dependency, lockfile, skills and
-`.agent-tool-skills.json` together. The required check is `CI gate` (see
-`agent-tool.json`).
+`.agents/skills` and `.claude/skills`, or the harness permission rules that
+`agent-tool permissions install --apply` generates (`.claude/settings.json`,
+`.codex/rules/agent-tool.rules` and `.agent-tool-permissions.json`); classify the
+executables agents run through `bun run agent-tool bun x` in `permissions.executables`
+of `agent-tool.json` instead. After upgrading the dependency or changing that section,
+run `bun run agents:sync` and commit the dependency, lockfile, skills,
+`.agent-tool-skills.json` and the permission files together; `bun run agents:check`
+checks both. The required check is `CI gate` (see `agent-tool.json`).
 
 The root package is versioned (`versions` in `agent-tool.json`): each shipped PR carries
 `package.json` one patch past the pinned base, and a deliberate minor or major bump is
