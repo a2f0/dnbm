@@ -6,6 +6,14 @@ never import each other. `scripts/build/build.ts` bundles the synth into each ap
 packages are private and only the root's `@a2f0/dnbm` is published, with its
 entrypoints in `src/`.
 
+## Layering
+
+Imports point down: the apps import `@a2f0/dnbm-synth`, never the reverse, and never
+each other. Inside the sequencer, `app.ts` builds the panels in `ui/`, which see it only
+through the `Editor` interface in `editor.ts`, so no panel imports `app.ts`. Biome
+enforces both: `noImportCycles` (type-only imports included) and the
+`noRestrictedImports` overrides in `biome.jsonc`.
+
 ## Mounting
 
 Every app runs inside a page that may hold other things: a host's mini-app window, or
