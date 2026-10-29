@@ -35,8 +35,12 @@ Run `bun audit` separately; CI's lint job requires it too.
 
 Tests use installed Google Chrome through `playwright-core`, including real host
 pages for the packed npm app. Keep same-origin/cross-origin assets, content security
-policy, abort cleanup, greyscale, and standalone tracking coverage. The Rust build
-uses the pinned rustup toolchain and `wasm-opt` from `.mise.toml`.
+policy, abort cleanup, greyscale, and standalone tracking coverage. Browser suites
+launch and close Chrome with `launchChrome` and `closeChrome` from
+`scripts/testing/chrome.ts`, in hooks given its `TEARDOWN_TIMEOUT`: launching and
+closing have their own budgets, and a Chrome that won't close in time is killed with a
+warning, so a loaded host can't fail a suite whose tests passed. The Rust build uses
+the pinned rustup toolchain and `wasm-opt` from `.mise.toml`.
 
 `bun run check` uses `scripts/testing/check.json` to run the same steps sequentially
 through agent-tool. It prints a structured report with per-step logs and source

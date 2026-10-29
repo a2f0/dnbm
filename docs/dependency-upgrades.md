@@ -25,6 +25,16 @@ smoke test checks API compatibility separately. A passed build does not establis
 a clean audit or deployment safety; follow the skill's preview requirements
 before any separately authorized [deployment](deploying.md).
 
+## Browser tests
+
+The browser suites' Chrome (`scripts/testing/chrome.ts`) passes its own
+`--disable-features`, and Chrome reads only the last one, so it repeats
+playwright-core's list (`chromiumSwitches`). `scripts/testing/chrome.test.ts` fails
+when a playwright-core upgrade changes that list; copy the new one. The extra
+`UnexportableKeyDeletion` stops Chrome on macOS from spending about five seconds in
+the keychain after each context closes. If a Chrome update renames it, closing slows
+down again and `closeChrome` warns that it killed Chrome.
+
 ## Deployment compatibility
 
 The assets-only Worker has no bindings or migrations; its custom domain belongs

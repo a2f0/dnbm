@@ -7,8 +7,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { type Browser, chromium, type Locator, type Page } from "playwright-core";
+import type { Browser, Locator, Page } from "playwright-core";
 import { buildPackage } from "../scripts/build/buildPackage";
+import { closeChrome, launchChrome, TEARDOWN_TIMEOUT } from "../scripts/testing/chrome";
 import type {
   DnbmOptions,
   DnbmPlayerInstance,
@@ -17,17 +18,6 @@ import type {
 } from "../src/index";
 
 const ROOT = join(import.meta.dir, "..");
-// Chrome's graceful process exit alone can take five seconds on macOS.
-const BROWSER_TEARDOWN_TIMEOUT = 15_000;
-
-async function closeBrowser(browser: Browser | undefined): Promise<void> {
-  if (!browser) return;
-  try {
-    await Promise.all(browser.contexts().map((context) => context.close()));
-  } finally {
-    await browser.close();
-  }
-}
 
 interface Packed {
   readonly filename: string;
@@ -555,7 +545,7 @@ describe("the packaged app mounted in a host page", () => {
     await writeFile(join(host, "index.html"), HOST_PAGE);
     server = serve({ "/lib/": join(installed, "lib"), "/": host });
     // No autoplay override: audio must start from a click inside the app.
-    browser = await chromium.launch({ channel: "chrome", headless: true });
+    browser = await launchChrome();
     page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1700, height: 900 } });
     page.on("pageerror", (error) => errors.push(error.message));
     await page.addInitScript(instrument);
@@ -567,11 +557,11 @@ describe("the packaged app mounted in a host page", () => {
 
   afterAll(async () => {
     try {
-      await closeBrowser(browser);
+      await closeChrome(browser);
     } finally {
       await server?.stop(true);
     }
-  }, BROWSER_TEARDOWN_TIMEOUT);
+  }, TEARDOWN_TIMEOUT);
 
   test("mounts in a shadow root, ready once it shows, embedded without the wordmark", async () => {
     expect(await page.locator("iframe").count()).toBe(0);
@@ -1399,7 +1389,7 @@ describe("the packaged app driven by its host's controls", () => {
     await copyAssets(join(host, "dnbm"));
     await writeFile(join(host, "index.html"), HOST_PAGE);
     server = serve({ "/lib/": join(installed, "lib"), "/": host });
-    browser = await chromium.launch({ channel: "chrome", headless: true });
+    browser = await launchChrome();
     page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1700, height: 900 } });
     page.on("pageerror", (error) => errors.push(error.message));
     await page.addInitScript(instrument);
@@ -1410,11 +1400,11 @@ describe("the packaged app driven by its host's controls", () => {
 
   afterAll(async () => {
     try {
-      await closeBrowser(browser);
+      await closeChrome(browser);
     } finally {
       await server?.stop(true);
     }
-  }, BROWSER_TEARDOWN_TIMEOUT);
+  }, TEARDOWN_TIMEOUT);
 
   /**
    * Presses the host's own button, which runs `command` on an app as a host's menu item
@@ -2011,7 +2001,7 @@ describe("the packaged app with its assets on another origin", () => {
     );
     const hostServer = serve({ "/lib/": join(installed, "lib"), "/": host });
     servers = [assetServer, hostServer];
-    browser = await chromium.launch({ channel: "chrome", headless: true });
+    browser = await launchChrome();
     page = await browser.newPage({
       acceptDownloads: true,
       viewport: { width: 1280, height: 1300 },
@@ -2024,11 +2014,11 @@ describe("the packaged app with its assets on another origin", () => {
 
   afterAll(async () => {
     try {
-      await closeBrowser(browser);
+      await closeChrome(browser);
     } finally {
       await Promise.all(servers.map((server) => server.stop(true)));
     }
-  }, BROWSER_TEARDOWN_TIMEOUT);
+  }, TEARDOWN_TIMEOUT);
 
   test("plays, and exports a WAV through its worker", async () => {
     const sequencer = page.locator("#window");
@@ -2096,16 +2086,16 @@ describe("the packaged site's own pages", () => {
     }
     expect(headers["Content-Security-Policy"]).toContain("style-src 'self'");
     server = serve({ "/": join(installed, "site") }, { headers });
-    browser = await chromium.launch({ channel: "chrome", headless: true });
+    browser = await launchChrome();
   }, 60_000);
 
   afterAll(async () => {
     try {
-      await closeBrowser(browser);
+      await closeChrome(browser);
     } finally {
       await server?.stop(true);
     }
-  }, BROWSER_TEARDOWN_TIMEOUT);
+  }, TEARDOWN_TIMEOUT);
 
   /** Opens a page, collecting errors and content security policy violations. */
   async function open(path: string): Promise<{ page: Page; problems: string[] }> {
