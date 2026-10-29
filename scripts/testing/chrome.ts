@@ -52,8 +52,14 @@ export const TEARDOWN_TIMEOUT = CLOSE_TIMEOUT + KILL_TIMEOUT + 5_000;
 
 const processes = new WeakMap<Browser, number>();
 
-/** Launches Chrome headless, keeping its process to kill if it won't close. */
+/**
+ * Launches Chrome headless and finds its process, to kill if it won't close, all within
+ * `LAUNCH_TIMEOUT`. If finding the process fails, closes Chrome within its close budget
+ * before rethrowing; a Chrome that ignores even that is left to Playwright, which kills
+ * the browsers it launched when the test process exits.
+ */
 export async function launchChrome(options: LaunchOptions = {}): Promise<Browser> {
+  const started = performance.now();
   const browser = await chromium.launch({
     channel: "chrome",
     headless: true,
@@ -61,10 +67,15 @@ export async function launchChrome(options: LaunchOptions = {}): Promise<Browser
     ...options,
     args: [...(options.args ?? []), `--disable-features=${DISABLED_FEATURES.join(",")}`],
   });
+  const finding = browserProcess(browser);
   try {
-    processes.set(browser, await browserProcess(browser));
+    const remaining = Math.max(0, LAUNCH_TIMEOUT - (performance.now() - started));
+    if (!(await settles(finding, remaining))) {
+      throw new Error(`Chrome didn't report its process within ${LAUNCH_TIMEOUT} ms of launching`);
+    }
+    processes.set(browser, await finding);
   } catch (error) {
-    await browser.close();
+    await settles(browser.close(), CLOSE_TIMEOUT).catch(() => false);
     throw error;
   }
   return browser;
