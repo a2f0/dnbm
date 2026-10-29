@@ -56,6 +56,12 @@
   "binaries": {
     "allow": []
   },
+  "permissions": {
+    "executables": {
+      "biome": "local",
+      "wrangler": "release"
+    }
+  },
   "images": {
     "targets": {
       "favicons": {
