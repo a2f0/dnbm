@@ -43,6 +43,7 @@
   },
   // Layering (docs/architecture.md): synth is below both apps, the apps never import
   // each other, and the sequencer's panels see the editor through editor.ts, not app.ts.
+  // A later override replaces an earlier one's options, so the panels repeat the apps rule.
   "overrides": [
     {
       "includes": ["packages/synth/**"],
@@ -118,6 +119,10 @@
               "level": "error",
               "options": {
                 "patterns": [
+                  {
+                    "group": ["**/player/**", "@a2f0/dnbm-player"],
+                    "message": "The apps never import each other; shared code belongs in packages/synth."
+                  },
                   {
                     "group": ["**/app", "**/mount", "**/main"],
                     "message": "Panels see the editor through ../editor (the Editor interface), not app.ts."
