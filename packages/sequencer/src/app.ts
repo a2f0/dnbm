@@ -1,67 +1,26 @@
 // The editor: connects the song store, the view, the audio engine and the panels.
 
 import { EngineHost, type PlayingPosition } from "@a2f0/dnbm-synth/audio/engineHost";
-import type { RenderReply, RenderRequest } from "@a2f0/dnbm-synth/audio/renderWorker";
 import { PlayMode } from "@a2f0/dnbm-synth/audio/wasmEngine";
-import { newSong } from "@a2f0/dnbm-synth/song/defaults";
-import { parseSongText, SongError, serializeSong } from "@a2f0/dnbm-synth/song/format";
+import { serializeSong } from "@a2f0/dnbm-synth/song/format";
 import { INSTRUMENTS } from "@a2f0/dnbm-synth/song/instruments";
 import type { Pattern, Song, Track } from "@a2f0/dnbm-synth/song/model";
 import type { DnbmSequencerCommand } from "../../../src/control";
 import type { Editor, Environment } from "./editor";
+import { SongFiles } from "./songFiles";
+import { AUTOSAVE_KEY, SAVED_KEY, writeStorage } from "./storage";
 import { type ChangeSource, SongStore } from "./store";
 import { DevicePanel } from "./ui/device";
 import { Dialogs } from "./ui/dialog";
 import { h, isTyping } from "./ui/dom";
-import { download, openSongFile, saveSongFile, songFileName } from "./ui/files";
+import { download, songFileName } from "./ui/files";
 import { Grid } from "./ui/grid";
 import { MixerPanel } from "./ui/mixer";
 import { PatternBar } from "./ui/patternBar";
 import { Scope } from "./ui/scope";
 import { Transport } from "./ui/transport";
 import type { View } from "./view";
-
-export const AUTOSAVE_KEY = "dnbm:song";
-export const SAVED_KEY = "dnbm:saved";
-
-/** Reads browser storage, which can throw (private windows, blocked storage). */
-export function readStorage(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStorage(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Storage is a convenience; the song still lives in memory and in saved files.
-  }
-}
-
-/**
- * Starts a module worker. Browsers only start workers from the page's origin, so a
- * script on another origin (assets served with CORS) loads through a same-origin shim.
- * `end` terminates the worker and frees the shim.
- */
-function moduleWorker(url: URL): { readonly worker: Worker; end(): void } {
-  if (url.origin === location.origin) {
-    const worker = new Worker(url, { type: "module" });
-    return { worker, end: () => worker.terminate() };
-  }
-  const shim = new Blob([`import ${JSON.stringify(url.href)};`], { type: "text/javascript" });
-  const shimUrl = URL.createObjectURL(shim);
-  const worker = new Worker(shimUrl, { type: "module" });
-  return {
-    worker,
-    end: () => {
-      worker.terminate();
-      URL.revokeObjectURL(shimUrl);
-    },
-  };
-}
+import { renderWav } from "./wavExport";
 
 export class App implements Editor {
   readonly store: SongStore;
@@ -73,8 +32,7 @@ export class App implements Editor {
   private readonly auditions = new Map<number, symbol>();
   private keyboardNavigation = false;
   private syncQueued = false;
-  private fileHandle: FileSystemFileHandle | undefined;
-  private fileName: string | undefined;
+  private readonly files: SongFiles;
   private readonly transport: Transport;
   private readonly patternBar: PatternBar;
   private readonly grid: Grid;
@@ -107,6 +65,17 @@ export class App implements Editor {
       position: undefined,
       penNotes: new Map(),
     };
+    this.files = new SongFiles({
+      store: this.store,
+      view: this.view,
+      dialogs: this.dialogs,
+      signal: environment.signal,
+      asset: (path) => this.asset(path),
+      say: (message, error) => this.say(message, error),
+      render: () => this.render(),
+      stop: () => this.stop(),
+      autosave: () => this.autosave(),
+    });
     this.scope = new Scope(environment.signal);
     this.transport = new Transport(this, this.scope);
     this.patternBar = new PatternBar(this);
@@ -242,7 +211,7 @@ export class App implements Editor {
 
   /** The file the song opened from or saves to. */
   private currentFileName(): string {
-    return this.fileName ?? songFileName(this.song.title);
+    return this.files.fileName();
   }
 
   /** Which of its commands the app takes now: none while a dialog asks something. */
@@ -447,128 +416,34 @@ export class App implements Editor {
     this.host?.release(trackIndex);
   }
 
-  private load(
-    song: Song,
-    name: string | undefined,
-    handle: FileSystemFileHandle | undefined,
-    text?: string,
-  ): void {
-    this.stop();
-    this.fileHandle = handle;
-    this.fileName = name;
-    this.view.startSlot = 0;
-    this.view.patternId = song.patterns[0]?.id ?? "a";
-    this.view.trackId = song.tracks[0]?.id ?? "";
-    this.store.load(song, text);
+  newSong(): Promise<void> {
+    return this.files.newSong();
   }
 
-  private async confirmDiscard(): Promise<boolean> {
-    return (
-      !this.store.dirty ||
-      (await this.dialogs.confirm("Discard unsaved changes to this song?", "discard"))
-    );
+  open(): Promise<void> {
+    return this.files.open();
   }
 
-  async newSong(): Promise<void> {
-    // The app may go while it asks, or before the answer arrives, as when the host runs
-    // a command and destroys the app at once: then it does nothing more.
-    if (!(await this.confirmDiscard()) || this.gone) return;
-    this.load(newSong(), undefined, undefined);
-    this.say("New song.");
+  openExample(file: string): Promise<void> {
+    return this.files.openExample(file);
   }
 
-  /** Loads song text, as from a file; reports errors instead of throwing. */
-  openText(text: string, name: string, handle?: FileSystemFileHandle): void {
-    if (this.gone) return;
-    try {
-      this.load(parseSongText(text), name, handle, text);
-      this.say(`Opened ${name}.`);
-    } catch (error) {
-      const message = error instanceof SongError ? error.message : String(error);
-      this.say(`Couldn't open ${name}: ${message}`, true);
-    }
-  }
-
-  async open(): Promise<void> {
-    // Gone by now, the app opens no picker.
-    if (!(await this.confirmDiscard()) || this.gone) return;
-    try {
-      const file = await openSongFile();
-      if (file) this.openText(file.text, file.name, file.handle);
-    } catch (error) {
-      this.say(`Couldn't open: ${error instanceof Error ? error.message : error}`, true);
-    }
-  }
-
-  async openExample(file: string): Promise<void> {
-    if (!(await this.confirmDiscard()) || this.gone) return;
-    try {
-      const response = await fetch(this.asset(`songs/${file}`), {
-        signal: this.environment.signal,
-      });
-      if (!response.ok) throw new Error(`${response.status}`);
-      this.openText(await response.text(), file);
-      this.fileName = undefined;
-      this.render();
-    } catch (error) {
-      if (this.environment.signal.aborted) return;
-      this.say(`Couldn't load ${file}: ${error instanceof Error ? error.message : error}`, true);
-    }
-  }
-
-  async save(saveAs = false): Promise<void> {
-    const text = serializeSong(this.song);
-    const name = this.currentFileName();
-    try {
-      const handle = await saveSongFile(
-        text,
-        name,
-        saveAs ? undefined : this.fileHandle,
-        this.environment.signal,
-      );
-      if (handle === null || this.gone) return;
-      this.fileHandle = handle;
-      this.fileName = handle?.name ?? name;
-      this.store.markSaved(text);
-      this.autosave();
-      this.render();
-      this.say(handle ? `Saved ${this.fileName}.` : `Downloaded ${name}.`);
-    } catch (error) {
-      if (this.gone) return;
-      this.say(`Couldn't save: ${error instanceof Error ? error.message : error}`, true);
-    }
+  save(saveAs = false): Promise<void> {
+    return this.files.save(saveAs);
   }
 
   async exportWav(): Promise<void> {
     const { signal } = this.environment;
     this.say("Rendering…");
     try {
-      const wasm = await fetch(this.asset("engine.wasm"), { signal }).then((response) =>
-        response.arrayBuffer(),
-      );
-      // Gone while the engine loaded: start no worker, which an abort that already
-      // happened would never stop.
-      if (signal.aborted) return;
-      const { worker, end } = moduleWorker(this.asset("renderWorker.js"));
-      const request: RenderRequest = { wasm, song: this.song, sampleRate: 48_000 };
-      let stop = () => {};
-      const wav = await new Promise<ArrayBuffer>((resolve, reject) => {
-        stop = () => reject(signal.reason);
-        signal.addEventListener("abort", stop, { once: true });
-        worker.onmessage = (event: MessageEvent<RenderReply>) => {
-          const reply = event.data;
-          if (reply.type === "progress")
-            this.say(`Rendering… ${Math.round(reply.fraction * 100)}%`);
-          else if (reply.type === "done") resolve(reply.wav);
-          else reject(new Error(reply.message));
-        };
-        worker.onerror = (event) => reject(new Error(event.message));
-        worker.postMessage(request, [wasm]);
-      }).finally(() => {
-        signal.removeEventListener("abort", stop);
-        end();
+      const wav = await renderWav({
+        engine: this.asset("engine.wasm"),
+        worker: this.asset("renderWorker.js"),
+        song: () => this.song,
+        signal,
+        onProgress: (fraction) => this.say(`Rendering… ${Math.round(fraction * 100)}%`),
       });
-      if (signal.aborted) return;
+      if (wav === undefined || signal.aborted) return;
       const name = songFileName(this.song.title).replace(/\.dnbm\.json$/, ".wav");
       download(new Blob([wav], { type: "audio/wav" }), name);
       this.say(`Exported ${name}.`);
@@ -623,7 +498,7 @@ export class App implements Editor {
       event.preventDefault();
       const file = (event as DragEvent).dataTransfer?.files[0];
       if (!file || root.querySelector("dialog[open]")) return;
-      if (await this.confirmDiscard()) this.openText(await file.text(), file.name);
+      if (await this.files.confirmDiscard()) this.files.openText(await file.text(), file.name);
     });
   }
 }
