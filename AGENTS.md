@@ -35,10 +35,12 @@ hooks, then run `bun run hooks:install --adopt`; see [development](docs/developm
 ## Validation
 
 `bun run check` (`scripts/testing/check.json`) is the full local gate; the pre-push
-hook runs it, and CI runs the same checks. The package test mounts the packed apps in
-host pages in Google Chrome (through `playwright-core`), with the assets on the host's
-origin and on another, and loads the site's own pages under its content security
-policy, so checks need Chrome installed, as GitHub's runners have.
+hook runs it, and CI runs the same checks. The package tests (`test/package/`) mount the
+packed apps in host pages in Google Chrome (through `playwright-core`), with the assets
+on the host's origin and on another, and load the site's own pages under its content
+security policy, so checks need Chrome installed, as GitHub's runners have. They share
+one packed package and one Chrome per `bun test` process; don't run them with
+`--parallel` (see [development](docs/development.md)).
 
 While iterating:
 
