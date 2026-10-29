@@ -54,11 +54,11 @@ colours, and no rule of the app's reaches the host. Work
 that outlives the app, such as a file picker still open when it is destroyed, writes
 nothing to storage once its signal has aborted.
 
-| Package                      | Holds                                                                                                                                                           |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `synth` (`@a2f0/dnbm-synth`) | The Rust engine (`engine/`), its AudioWorklet host, offline render and WAV export (`src/audio/`), and the song model, format, schema and compiler (`src/song/`) |
-| `sequencer`                  | The editor: the song store and its panels                                                                                                                       |
-| `player`                     | A playlist, a display and transport controls over a list of songs                                                                                               |
+| Package                      | Holds                                                                                                                                                                                                             |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `synth` (`@a2f0/dnbm-synth`) | The Rust engine (`engine/`), its AudioWorklet host, offline render and WAV export (`src/audio/`), the song model, format, schema and compiler (`src/song/`), and the DOM helpers both apps build with (`src/ui/`) |
+| `sequencer`                  | The editor: the song store and its panels                                                                                                                                                                         |
+| `player`                     | A playlist, a display and transport controls over a list of songs                                                                                                                                                 |
 
 ```text
   sequencer UI ──edits──▶  SongStore  ──compileSong──▶  Float32Array
