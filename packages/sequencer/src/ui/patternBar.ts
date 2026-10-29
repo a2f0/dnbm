@@ -4,7 +4,7 @@ import { createPattern, nextPatternId } from "@a2f0/dnbm-synth/song/defaults";
 import { INSTRUMENTS } from "@a2f0/dnbm-synth/song/instruments";
 import { ID_PATTERN, MAX_PATTERNS, type Song } from "@a2f0/dnbm-synth/song/model";
 import { DRUM_REST, emptyRow, MAX_BARS, REST, STEPS_PER_BAR } from "@a2f0/dnbm-synth/song/notation";
-import type { App } from "../app";
+import type { Editor } from "../editor";
 import type { View } from "../view";
 import { h, reveal, setClass } from "./dom";
 
@@ -19,7 +19,7 @@ export class PatternBar {
   private chipKey = "";
   private playingSlot: number | undefined;
 
-  constructor(private readonly app: App) {
+  constructor(private readonly app: Editor) {
     this.tabs = h("div", { class: "tabs", role: "tablist", "aria-label": "Patterns" });
     this.tabs.addEventListener("click", (event) => {
       const tab = (event.target as HTMLElement).closest<HTMLElement>("[data-pattern]");

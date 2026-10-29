@@ -7,6 +7,7 @@
   "exports": {
     "./audio/*": "./src/audio/*.ts",
     "./song/*": "./src/song/*.ts",
-    "./standalone/*": "./src/standalone/*.ts"
+    "./standalone/*": "./src/standalone/*.ts",
+    "./ui/*": "./src/ui/*.ts"
   }
 }

@@ -7,7 +7,8 @@ import { newSong } from "@a2f0/dnbm-synth/song/defaults";
 import { parseSongText, SongError, serializeSong } from "@a2f0/dnbm-synth/song/format";
 import { INSTRUMENTS } from "@a2f0/dnbm-synth/song/instruments";
 import type { Pattern, Song, Track } from "@a2f0/dnbm-synth/song/model";
-import type { DnbmSequencerCommand, DnbmSequencerState } from "../../../src/control";
+import type { DnbmSequencerCommand } from "../../../src/control";
+import type { Editor, Environment } from "./editor";
 import { type ChangeSource, SongStore } from "./store";
 import { DevicePanel } from "./ui/device";
 import { Dialogs } from "./ui/dialog";
@@ -40,24 +41,6 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
-/** Where the app runs: what it renders in and loads from, and how long it lives. */
-export interface Environment {
-  /** The app's frame in its shadow root: its keyboard, pointer and drop events. */
-  readonly frame: HTMLElement;
-  /** The root the frame is in, where dialogs open. */
-  readonly root: Document | ShadowRoot;
-  /** The slash-terminated directory the engine, worker and example songs load from. */
-  readonly assets: URL;
-  /** Aborts when the app goes: it then releases audio, workers, timers and frames. */
-  readonly signal: AbortSignal;
-  /** Receives the title the app gives its page, when it has a page of its own. */
-  readonly onTitle?: ((title: string) => void) | undefined;
-  /** The app shows its own buttons for its commands; false when its host shows them. */
-  readonly actions: boolean;
-  /** Receives the app's state for its host whenever it may have changed. */
-  readonly onState?: ((state: DnbmSequencerState) => void) | undefined;
-}
-
 /**
  * Starts a module worker. Browsers only start workers from the page's origin, so a
  * script on another origin (assets served with CORS) loads through a same-origin shim.
@@ -80,7 +63,7 @@ function moduleWorker(url: URL): { readonly worker: Worker; end(): void } {
   };
 }
 
-export class App {
+export class App implements Editor {
   readonly store: SongStore;
   readonly view: View;
   readonly dialogs: Dialogs;

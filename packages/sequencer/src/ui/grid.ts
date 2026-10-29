@@ -25,7 +25,7 @@ import {
   STEPS_PER_BEAT,
   TIE,
 } from "@a2f0/dnbm-synth/song/notation";
-import type { App } from "../app";
+import type { Editor } from "../editor";
 import type { View } from "../view";
 import { h, reveal, setClass, setText } from "./dom";
 
@@ -105,7 +105,7 @@ export class Grid {
   private auditionTrack: number | undefined;
   private now: number | undefined;
 
-  constructor(private readonly app: App) {
+  constructor(private readonly app: Editor) {
     this.ruler = h("div", { class: "ruler", "aria-hidden": "true" });
     this.body = h("div", {
       class: "grid",
