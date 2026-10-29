@@ -2,8 +2,9 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import type { ClickEvent } from "@a2f0/ct-client";
 import { createSiteTracker } from "@a2f0/dnbm-synth/standalone/tracking";
-import { type Browser, chromium, type Page } from "playwright-core";
+import type { Browser, Page } from "playwright-core";
 import { buildWeb, DIST, ROOT } from "../scripts/build/build";
+import { closeChrome, launchChrome, TEARDOWN_TIMEOUT } from "../scripts/testing/chrome";
 
 const ORIGIN = "https://dnbm.a2f0.net";
 const COLLECTOR = "https://ct.a2f0.net/v1/clicks";
@@ -41,7 +42,7 @@ describe("standalone click tracking", () => {
           : new Response("Not found", { status: 404 });
       },
     });
-    browser = await chromium.launch({ channel: "chrome", headless: true });
+    browser = await launchChrome();
   }, 60_000);
 
   // The first page a newly launched Chrome loads pays its cold start, which on CI
@@ -54,9 +55,12 @@ describe("standalone click tracking", () => {
   }, 30_000);
 
   afterAll(async () => {
-    await browser?.close();
-    await server?.stop(true);
-  });
+    try {
+      await closeChrome(browser);
+    } finally {
+      await server?.stop(true);
+    }
+  }, TEARDOWN_TIMEOUT);
 
   async function open(
     path: string,

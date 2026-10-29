@@ -10,7 +10,7 @@ Use the stable package scripts from the repository root. See
 | `songs/`     | Canonical song checking/formatting and offline WAV rendering: `songs:check`, `songs:fmt`, `render`. |
 | `checks/`    | Repository lint/policy checks and fixtures.                                                         |
 | `git/hooks/` | Tracked hook bodies; installation and drift checks use agent-tool.                                  |
-| `testing/`   | The full validation run-group plan used by `check`.                                                 |
+| `testing/`   | The full validation run-group plan used by `check`, and the Chrome every browser suite launches.    |
 
 Update imports, relative root resolution, package commands, CI, hooks, tests, and
 documentation when moving a script. Keep the product-specific song/audio adapters

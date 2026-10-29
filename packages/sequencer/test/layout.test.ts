@@ -4,8 +4,9 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { type Browser, chromium } from "playwright-core";
+import type { Browser } from "playwright-core";
 import { build, DIST } from "../../../scripts/build/build";
+import { closeChrome, launchChrome, TEARDOWN_TIMEOUT } from "../../../scripts/testing/chrome";
 
 interface Layout {
   readonly topBar: number;
@@ -30,13 +31,16 @@ beforeAll(async () => {
       return file.size > 0 ? new Response(file) : new Response("Not found", { status: 404 });
     },
   });
-  browser = await chromium.launch({ channel: "chrome", headless: true });
+  browser = await launchChrome();
 }, 120_000);
 
 afterAll(async () => {
-  await browser?.close();
-  await server?.stop(true);
-});
+  try {
+    await closeChrome(browser);
+  } finally {
+    await server?.stop(true);
+  }
+}, TEARDOWN_TIMEOUT);
 
 /** Opens the example song embedded at a size and measures the layout. */
 async function layout(width: number, height: number): Promise<Layout> {
