@@ -6,8 +6,9 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { newSong } from "@a2f0/dnbm-synth/song/defaults";
 import { serializeSong } from "@a2f0/dnbm-synth/song/format";
-import { type Browser, chromium, type Page } from "playwright-core";
+import type { Browser, Page } from "playwright-core";
 import { build, DIST, ROOT } from "../../../scripts/build/build";
+import { closeChrome, launchChrome, TEARDOWN_TIMEOUT } from "../../../scripts/testing/chrome";
 import { clock, timeline } from "../src/timeline";
 
 const SONG_COUNT = readdirSync(join(ROOT, "songs")).filter((file) =>
@@ -37,17 +38,16 @@ beforeAll(async () => {
       return file.size > 0 ? new Response(file) : new Response("Not found", { status: 404 });
     },
   });
-  browser = await chromium.launch({
-    channel: "chrome",
-    headless: true,
-    args: ["--autoplay-policy=no-user-gesture-required"],
-  });
+  browser = await launchChrome({ args: ["--autoplay-policy=no-user-gesture-required"] });
 }, 120_000);
 
 afterAll(async () => {
-  await browser?.close();
-  await server?.stop(true);
-});
+  try {
+    await closeChrome(browser);
+  } finally {
+    await server?.stop(true);
+  }
+}, TEARDOWN_TIMEOUT);
 
 async function state(page: Page): Promise<string | null> {
   return page.locator(".player").getAttribute("data-state");
