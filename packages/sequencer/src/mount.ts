@@ -8,7 +8,8 @@ import { parseSong, parseSongText } from "@a2f0/dnbm-synth/song/format";
 import type { Song } from "@a2f0/dnbm-synth/song/model";
 import undertow from "../../../songs/undertow.dnbm.json";
 import type { AppContext, AppControl } from "../../../src/shell";
-import { App, AUTOSAVE_KEY, readStorage, SAVED_KEY } from "./app";
+import { App } from "./app";
+import { AUTOSAVE_KEY, readStorage, SAVED_KEY } from "./storage";
 import { h } from "./ui/dom";
 
 function initialSong(): { song: Song; saved: string | undefined } {

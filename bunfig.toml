@@ -1,2 +1,6 @@
 [install]
 exact = true
+
+[test]
+# Shared teardown: the package suites share one packed package and one Chrome.
+preload = ["./test/support/teardown.ts"]

@@ -10,7 +10,9 @@ entrypoints in `src/`.
 
 Imports point down: the apps import `@a2f0/dnbm-synth`, never the reverse, and never
 each other. Inside the sequencer, `app.ts` builds the panels in `ui/`, which see it only
-through the `Editor` interface in `editor.ts`, so no panel imports `app.ts`. Biome
+through the `Editor` interface in `editor.ts`, so no panel imports `app.ts`. The song's
+file (`songFiles.ts`, through its `SongFilesHost`), WAV export (`wavExport.ts`) and
+browser storage (`storage.ts`) sit below `app.ts` the same way. Biome
 enforces both: `noImportCycles` (type-only imports included) and the
 `noRestrictedImports` overrides in `biome.jsonc`.
 

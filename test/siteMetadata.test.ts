@@ -1,8 +1,8 @@
 // The standalone site's search and sharing metadata (scripts/build/siteMetadata.ts): a
 // production build gives each page a canonical URL, shared tags and JSON-LD, renders the
 // share image, lists the pages for crawlers, and adds the 404 page unknown paths get.
-// test/package.test.ts checks that the package's pages name the same canonical URLs and
-// leave out the site root's files.
+// test/package/published.test.ts checks that the package's pages name the same canonical
+// URLs and leave out the site root's files.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
