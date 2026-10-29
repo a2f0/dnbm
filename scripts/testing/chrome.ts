@@ -47,6 +47,8 @@ export const LAUNCH_TIMEOUT = 30_000;
 const CLOSE_TIMEOUT = 5_000;
 /** How long Chrome may take to exit once killed, which took well under a second. */
 const KILL_TIMEOUT = 5_000;
+/** How often to check whether a killed Chrome's processes are gone. */
+const POLL_INTERVAL = 20;
 /** A hook that closes Chrome: its close, its kill if need be, and its servers. */
 export const TEARDOWN_TIMEOUT = CLOSE_TIMEOUT + KILL_TIMEOUT + 5_000;
 
@@ -97,11 +99,14 @@ export async function browserProcess(browser: Browser): Promise<number> {
 /**
  * Closes the contexts, then Chrome, as Playwright advises. If that takes longer than
  * `budget`, kills Chrome's processes, waits for Playwright to see it exit and remove its
- * profile, and reports the overrun as a warning: the tests have finished by then.
+ * profile and for its processes to be gone, and reports the overrun as a warning: the
+ * tests have finished by then. `alive` is how it checks a process group is gone, which
+ * tests replace to make the exit late.
  */
 export async function closeChrome(
   browser: Browser | undefined,
   budget = CLOSE_TIMEOUT,
+  alive: (pid: number) => boolean = running,
 ): Promise<void> {
   if (!browser) return;
   const started = performance.now();
@@ -116,10 +121,16 @@ export async function closeChrome(
   const pid = processes.get(browser);
   if (!pid) throw new Error(`Chrome didn't close in ${budget} ms, and its process is unknown`);
   kill(pid);
+  const killed = performance.now();
   // Once Chrome is killed, closing a context may fail, but the browser's close, which
   // `closing` always reaches, resolves when Playwright has cleaned up after the exit.
+  // That can be as soon as the connection drops, before the process has been reaped, so
+  // it also waits for the processes themselves; the timers let Bun reap its child.
   const exited = closing.catch(() => undefined);
-  if (!(await settles(exited, KILL_TIMEOUT))) {
+  if (
+    !(await settles(exited, KILL_TIMEOUT)) ||
+    !(await gone(pid, KILL_TIMEOUT - (performance.now() - killed), alive))
+  ) {
     throw new Error(`Chrome (pid ${pid}) didn't exit within ${KILL_TIMEOUT} ms of being killed`);
   }
   const elapsed = Math.round(performance.now() - started);
@@ -138,6 +149,34 @@ async function settles(promise: Promise<unknown>, ms: number): Promise<boolean> 
     return await Promise.race([promise.then(() => true), timeout]);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** Whether `alive(pid)` turns false within `ms`, checking every `POLL_INTERVAL`. */
+async function gone(pid: number, ms: number, alive: (pid: number) => boolean): Promise<boolean> {
+  const deadline = performance.now() + ms;
+  while (alive(pid)) {
+    if (performance.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+  }
+  return true;
+}
+
+/**
+ * Whether Chrome's process group, or the process itself, still has a process, a zombie
+ * included: one that hasn't been reaped yet still answers signal 0.
+ */
+export function running(pid: number): boolean {
+  return exists(-pid) || exists(pid);
+}
+
+/** Whether signal 0 reaches `target`; only `ESRCH` means there is no such process. */
+function exists(target: number): boolean {
+  try {
+    process.kill(target, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
   }
 }
 
