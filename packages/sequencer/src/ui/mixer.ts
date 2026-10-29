@@ -8,7 +8,7 @@ import {
   REVERB_PARAMS,
 } from "@a2f0/dnbm-synth/song/instruments";
 import type { Mixer, Song } from "@a2f0/dnbm-synth/song/model";
-import type { App } from "../app";
+import type { Editor } from "../editor";
 import type { View } from "../view";
 import { ParamControl } from "./control";
 import { h, setClass } from "./dom";
@@ -80,7 +80,7 @@ export class MixerPanel {
     title: "Reset master peak",
   });
 
-  constructor(private readonly app: App) {
+  constructor(private readonly app: Editor) {
     this.peakReadout.addEventListener("click", () => this.resetPeak());
     this.strips = h("div", { class: "strips" });
     this.element = h("section", { class: "mixer", "aria-label": "Mixer" }, [

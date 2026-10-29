@@ -35,8 +35,99 @@
         "useConst": "error"
       },
       "suspicious": {
-        "noConsole": { "level": "error", "options": { "allow": ["error", "info", "warn"] } }
+        "noConsole": { "level": "error", "options": { "allow": ["error", "info", "warn"] } },
+        // Type-only imports count too: a type-only cycle still tangles the modules.
+        "noImportCycles": { "level": "error", "options": { "ignoreTypes": false } }
       }
     }
-  }
+  },
+  // Layering (docs/architecture.md): synth is below both apps, the apps never import
+  // each other, and the sequencer's panels see the editor through editor.ts, not app.ts.
+  "overrides": [
+    {
+      "includes": ["packages/synth/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/sequencer/**",
+                      "**/player/**",
+                      "@a2f0/dnbm-sequencer",
+                      "@a2f0/dnbm-player"
+                    ],
+                    "message": "The synth is below both apps; it never imports them."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/player/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/sequencer/**", "@a2f0/dnbm-sequencer"],
+                    "message": "The apps never import each other; shared code belongs in packages/synth."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/sequencer/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/player/**", "@a2f0/dnbm-player"],
+                    "message": "The apps never import each other; shared code belongs in packages/synth."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/sequencer/src/ui/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/app", "**/mount", "**/main"],
+                    "message": "Panels see the editor through ../editor (the Editor interface), not app.ts."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

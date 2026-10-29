@@ -3,7 +3,7 @@
 import type { PlayingPosition } from "@a2f0/dnbm-synth/audio/engineHost";
 import { BPM, quantize, SWING } from "@a2f0/dnbm-synth/song/instruments";
 import type { Song } from "@a2f0/dnbm-synth/song/model";
-import type { App } from "../app";
+import type { Editor } from "../editor";
 import type { SongStore } from "../store";
 import type { View } from "../view";
 import { ParamControl } from "./control";
@@ -41,7 +41,7 @@ export class Transport {
   private readonly redoButton: HTMLButtonElement;
   private readonly examples: HTMLSelectElement;
 
-  constructor(app: App, scope: Scope) {
+  constructor(app: Editor, scope: Scope) {
     this.title = h("input", {
       class: "title",
       "aria-label": "Song title",
@@ -157,7 +157,7 @@ export class Transport {
     ]);
   }
 
-  private async loadExamples(app: App): Promise<void> {
+  private async loadExamples(app: Editor): Promise<void> {
     try {
       const response = await fetch(app.asset("songs/index.json"), {
         signal: app.environment.signal,

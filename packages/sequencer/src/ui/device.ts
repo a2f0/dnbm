@@ -9,7 +9,7 @@ import {
 } from "@a2f0/dnbm-synth/song/instruments";
 import { ID_PATTERN, type Song } from "@a2f0/dnbm-synth/song/model";
 import { convertRow } from "@a2f0/dnbm-synth/song/notation";
-import type { App } from "../app";
+import type { Editor } from "../editor";
 import type { View } from "../view";
 import { ParamControl } from "./control";
 import { h, setText } from "./dom";
@@ -24,7 +24,7 @@ export class DevicePanel {
   private controls = new Map<string, ParamControl>();
   private key = "";
 
-  constructor(private readonly app: App) {
+  constructor(private readonly app: Editor) {
     this.name = h("input", {
       class: "device-name",
       "aria-label": "Track name",
