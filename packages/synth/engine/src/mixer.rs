@@ -126,7 +126,7 @@ impl Channel {
 }
 
 pub struct Master {
-    sample_rate: f32,
+    gain_coefficient: f32,
     level: f32,
     glue: f32,
     drive: f32,
@@ -138,7 +138,8 @@ pub struct Master {
 impl Master {
     pub fn new(sample_rate: f32) -> Self {
         Master {
-            sample_rate,
+            // Preserve approach's 10 ms time constant, but advance once per sample.
+            gain_coefficient: 1.0 - (-1.0 / (SMOOTHING_SECONDS * sample_rate)).exp(),
             level: 1.0,
             glue: 0.0,
             drive: 0.0,
@@ -157,17 +158,49 @@ impl Master {
     /// Glues, levels and soft-clips the bus in place; the output never exceeds 1.
     pub fn process(&mut self, left: &mut [f32], right: &mut [f32]) {
         self.compressor.process(left, right, self.glue);
-        let frames = left.len();
-        let next = approach(self.gain, self.level, frames, self.sample_rate);
-        let mut ramp = Ramp::new(self.gain, next, frames);
-        self.gain = next;
         let push = 1.0 + self.drive * 3.0;
         for (l, r) in left.iter_mut().zip(right.iter_mut()) {
-            let gain = ramp.tick() * push;
+            self.gain += (self.level - self.gain) * self.gain_coefficient;
+            let gain = self.gain * push;
             *l = saturate(*l * gain);
             *r = saturate(*r * gain);
             self.peaks[0] = self.peaks[0].max(l.abs());
             self.peaks[1] = self.peaks[1].max(r.abs());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn master_gain_follows_ten_millisecond_time_constant() {
+        for sample_rate in [44_100.0, 48_000.0] {
+            let mut master = Master::new(sample_rate);
+            master.set(-60.0, 0.0, 0.4);
+            let time_constant_frames = (sample_rate * 0.01) as usize;
+            let frames = time_constant_frames * 3;
+            let mut left = vec![2.0; frames];
+            let mut right = vec![-0.5; frames];
+            master.process(&mut left, &mut right);
+            for index in [
+                0,
+                time_constant_frames / 2 - 1,
+                time_constant_frames - 1,
+                frames - 1,
+            ] {
+                // A zero target leaves 1/e of the initial gain after 10 ms.
+                let gain = (-((index + 1) as f32) / (sample_rate * 0.01)).exp();
+                let push = 1.0 + 0.4 * 3.0;
+                assert!((left[index] - saturate(2.0 * gain * push)).abs() < 2e-5);
+                assert!((right[index] - saturate(-0.5 * gain * push)).abs() < 2e-5);
+            }
+            assert!(
+                left.iter()
+                    .chain(&right)
+                    .all(|x| x.is_finite() && x.abs() <= 1.0)
+            );
         }
     }
 }

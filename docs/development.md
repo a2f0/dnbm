@@ -57,6 +57,18 @@ Capture other noisy finite commands as [output capture](../AGENTS.md#output-capt
 describes. Interactive `bun run dev` runs directly. Check UI changes in a real
 browser, and use `bun run render <song>` to inspect audio changes offline.
 
+## Audio iteration
+
+[Music fidelity](music-fidelity.md) maintains the sound, composition and player
+opportunities. `bun run fidelity:capture <song> <new-directory>` builds and saves
+a reproducible WASM/WAV checkpoint with source identities and diagnostics;
+`bun run fidelity:compare <before> <after> <new-directory>` makes a portable,
+RMS-matched audition page. Put local outputs in `.fidelity/` (gitignored); the
+comparison refuses altered evidence and never overwrites a previous capture.
+Metrics are safety/behavior evidence, not a musical-quality score. See the queue
+for listening acceptance and [song notes](song-listening-notes.md) for each
+example's intended groove and section changes.
+
 ## Git hooks
 
 `bun run hooks:install` installs the three tracked hooks declared in `agent-tool.json`.

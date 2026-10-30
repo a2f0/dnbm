@@ -1,0 +1,4 @@
+interface:
+  display_name: "Music Fidelity"
+  short_description: "Iterate dnbm sound, songs and listening UX"
+  default_prompt: "Use $music-fidelity to choose a dnbm sound or song gap, render a baseline, improve it, compare level-matched audio, dogfood both apps and update the evidence queue."
