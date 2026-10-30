@@ -1,6 +1,6 @@
 {
   "name": "@a2f0/dnbm",
-  "version": "0.4.22",
+  "version": "0.4.23",
   "description": "A dark drum and bass sequencer, mixer and player with a WebAssembly audio engine, ready to embed in a page",
   "license": "UNLICENSED",
   "homepage": "https://dnbm.a2f0.net",
@@ -61,6 +61,8 @@
     "deploy:preview": "wrangler deploy --dry-run",
     "dev": "bun scripts/dev/serve.ts",
     "engine:check": "cargo fmt --manifest-path packages/synth/engine/Cargo.toml --check && cargo clippy --manifest-path packages/synth/engine/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path packages/synth/engine/Cargo.toml",
+    "fidelity:capture": "bun scripts/fidelity/capture.ts",
+    "fidelity:compare": "bun scripts/fidelity/compare.ts",
     "fix": "biome check --write && cargo fmt --manifest-path packages/synth/engine/Cargo.toml && bun scripts/songs/format.ts fmt",
     "hooks:check": "agent-tool hooks check",
     "hooks:install": "agent-tool hooks install --apply",

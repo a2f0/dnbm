@@ -131,6 +131,23 @@ run-group report, so run it directly to keep its structured evidence visible.
 - `tsconfig.json` extends `@tsconfig/strictest`; index-signature access uses brackets
   (`record["key"]`), so Biome's `useLiteralKeys` is off.
 
+## Music fidelity and product direction
+
+Until the owner changes direction, dnbm and its player are greenfield. Rethink
+synthesis, songs, sequencing and listening UX rather than preserving the current
+design by default. Keep deterministic, real-time-safe audio and host isolation;
+make format migrations and public API version changes deliberate.
+
+Use the repository-owned `music-fidelity` skill in `.agents/skills` or
+`.claude/skills` for sound/song improvements and dogfooding. Its maintained queue
+is [music fidelity](docs/music-fidelity.md), with per-song intent in
+[song listening notes](docs/song-listening-notes.md). Keep both skill copies
+identical; they are not agent-tool-managed. Capture before/after evidence with
+`fidelity:capture` and `fidelity:compare` into gitignored `.fidelity/`, never
+commit audio binaries. A successful render, passing test or advancing player
+clock is not a listening verdict: leave audible acceptance pending when no one
+has listened. The loop runs on request; it does not schedule work or deploy.
+
 ## Dependency updates
 
 Use the installed `update-dependencies` skill and read

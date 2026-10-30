@@ -52,6 +52,37 @@ async function renderInBlocks(song: Song, size: number, frames: number): Promise
   return out;
 }
 
+/** Changes only the master target, splitting blocks at fixed sample positions. */
+async function renderMasterInBlocks(
+  sampleRate: number,
+  size: number,
+  changes: ReadonlyArray<{ frame: number; level: number }>,
+): Promise<{ left: Float32Array; right: Float32Array }> {
+  const song = structuredClone(fourOnTheFloor);
+  // Both channels sound, but differ, so accidentally omitting either is observable.
+  for (const track of song.tracks) track.mixer.pan = 0.3;
+  const engine = await createEngine(sampleRate);
+  const left = new Float32Array(8192);
+  const right = new Float32Array(left.length);
+  try {
+    for (const [index, change] of changes.entries()) {
+      song.master.level = change.level;
+      engine.loadSong(compileSong(song));
+      if (index === 0) engine.play(PlayMode.Song, 0);
+      const end = changes[index + 1]?.frame ?? left.length;
+      for (let offset = change.frame; offset < end; ) {
+        const block = engine.render(Math.min(size, end - offset));
+        left.set(block.left, offset);
+        right.set(block.right, offset);
+        offset += block.frames;
+      }
+    }
+    return { left, right };
+  } finally {
+    engine.free();
+  }
+}
+
 function hash(...channels: Float32Array[]): number {
   let h = 2166136261;
   for (const channel of channels) {
@@ -107,6 +138,47 @@ describe("engine", () => {
     const blocks = async (size: number) => hash(await renderInBlocks(fourOnTheFloor, size, 48_000));
     expect(await blocks(128)).toBe(await blocks(4096));
     expect(await blocks(441)).toBe(await blocks(128));
+  });
+
+  describe("master gain is independent of render block size", () => {
+    const scenarios = [
+      { name: "non-unity initial level", changes: [{ frame: 0, level: -2 }] },
+      {
+        name: "target changes at fixed samples",
+        changes: [
+          { frame: 0, level: 0 },
+          { frame: 997, level: -18 },
+          { frame: 1531, level: 3 },
+          { frame: 5003, level: -60 },
+          { frame: 6023, level: 0 },
+        ],
+      },
+    ];
+    for (const sampleRate of [44_100, 48_000]) {
+      for (const { name, changes } of scenarios) {
+        for (const size of [128, 441, 4096]) {
+          test(`${name}, ${sampleRate} Hz, ${size} vs 1 frame`, async () => {
+            const reference = await renderMasterInBlocks(sampleRate, 1, changes);
+            const actual = await renderMasterInBlocks(sampleRate, size, changes);
+            expect(hash(reference.left)).not.toBe(hash(reference.right));
+            for (const channel of ["left", "right"] as const) {
+              expect(reference[channel].some((sample) => Math.abs(sample) > 0.01)).toBe(true);
+              expect(
+                actual[channel].every((sample) => Number.isFinite(sample) && Math.abs(sample) <= 1),
+              ).toBe(true);
+              let maximumDifference = 0;
+              for (const [index, sample] of reference[channel].entries()) {
+                maximumDifference = Math.max(
+                  maximumDifference,
+                  Math.abs(sample - (actual[channel][index] ?? Number.NaN)),
+                );
+              }
+              expect(maximumDifference).toBe(0);
+            }
+          });
+        }
+      }
+    }
   });
 
   test("renders pad notes identically every time and whatever the block size", async () => {

@@ -11,8 +11,9 @@ site/
 # Cargo
 packages/synth/engine/target/
 
-# Renders (bun run render)
+# Renders and local fidelity evidence (never published or committed)
 *.wav
+.fidelity/
 
 # Wrangler local state
 .wrangler/

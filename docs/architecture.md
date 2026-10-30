@@ -83,12 +83,16 @@ glue: `src/lib.rs` exports a C ABI of numbers and pointers into linear memory, a
   boundaries, so output is identical whatever the block size: 128-frame worklet quanta,
   4096-frame offline blocks, or anything else. Swing stretches even sixteenths and
   shrinks odd ones by the same amount.
-- **Instruments** (`instruments/`). All synthesized. Percussive tracks alternate between
+- **Instruments** (`instruments/`). All synthesized. Snare velocity controls the
+  bandwidth of its wire/noise layer as well as gain, so ghost strokes are darker
+  than accents while the pitched body stays intact. Percussive tracks alternate between
   two voices, so a retrigger fades the last hit out over 5 ms instead of clicking.
   Melodic tracks are monophonic; a note played over a held note glides to it.
 - **Mixer** (`mixer.rs`). Per track: a high-pass and low-pass (Simper trapezoidal SVFs),
-  `tanh` drive, a constant-power pan, and post-fader reverb and delay sends. Gains ramp
-  per block, so moving a control never zippers.
+  `tanh` drive, a constant-power pan, and post-fader reverb and delay sends. Channel
+  gains ramp per block, so moving a control never zippers; edit-time block parity
+  remains an open fidelity item. Master gain smooths per sample with a 10 ms time
+  constant so its trajectory is identical in live and offline render blocks.
 - **Effects** (`dsp/`). An eight-line feedback delay network reverb with damping in the
   loop, a tempo-synced ping-pong delay, a soft-knee bus compressor, and a `tanh` clipper,
   so output never exceeds full scale.
