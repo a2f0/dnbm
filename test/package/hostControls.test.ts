@@ -537,6 +537,128 @@ describe("the packaged app driven by its host's controls", () => {
     expect(errors).toEqual([]);
   }, 40_000);
 
+  test("host navigation preserves pause and stop discards the queued position", async () => {
+    await page.evaluate(() => (window as unknown as HostWindow).mountPlayer({ actions: false }));
+    expect(await hostRun("play", "playerApp")).toBe(true);
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("player").querySelector(".time")?.textContent !==
+        "0:00",
+    );
+    expect(await hostRun("pause", "playerApp")).toBe(true);
+    await page.waitForFunction(
+      () => (window as unknown as HostWindow).contexts.at(-1)?.state === "suspended",
+    );
+    const audio = () =>
+      page.evaluate(() => {
+        const context = (window as unknown as HostWindow).contexts.at(-1);
+        return { state: context?.state, time: context?.currentTime };
+      });
+    const before = await audio();
+    expect(await hostRun("next", "playerApp")).toBe(true);
+    expect(await state("playerApp")).toMatchObject({
+      title: "Undertow",
+      playing: false,
+      paused: true,
+      available: { play: true, pause: false, stop: true, previous: true, next: true },
+    });
+    expect(await hostRun("previous", "playerApp")).toBe(true);
+    expect(await state("playerApp")).toMatchObject({ title: "Wraith", paused: true });
+    expect(await hostRun("next", "playerApp")).toBe(true);
+    await player.locator(".seek").evaluate((seek: HTMLInputElement) => {
+      seek.value = "30";
+      seek.dispatchEvent(new Event("change"));
+    });
+    const queued = await player.locator(".seek").inputValue();
+    await page.waitForTimeout(1_700);
+    expect(await audio()).toEqual(before);
+    expect(await player.locator(".seek").inputValue()).toBe(queued);
+    expect(await state("playerApp")).toMatchObject({
+      title: "Undertow",
+      playing: false,
+      paused: true,
+    });
+    expect(await hostRun("stop", "playerApp")).toBe(true);
+    expect(await player.locator(".time").textContent()).toBe("0:00");
+    expect(await state("playerApp")).toMatchObject({ playing: false, paused: false });
+    expect(await hostRun("play", "playerApp")).toBe(true);
+    await page.waitForFunction(
+      () =>
+        (window as unknown as HostWindow).shadow("player").querySelector(".time")?.textContent !==
+        "0:00",
+    );
+    expect(Number(await player.locator(".seek").inputValue())).toBeLessThan(3);
+    expect(await hostRun("pause", "playerApp")).toBe(true);
+    expect(await hostRun("next", "playerApp")).toBe(true);
+    const resumedClosed = await page.evaluate(
+      () => (window as unknown as HostWindow).resumedClosed,
+    );
+    await page.evaluate(() => (window as unknown as HostWindow).playerApp?.destroy());
+    await page.waitForFunction(() =>
+      (window as unknown as HostWindow).contexts.every((context) => context.state === "closed"),
+    );
+    await page.waitForTimeout(1_700);
+    expect(await hostRun("play", "playerApp")).toBe(false);
+    expect(await page.evaluate(() => (window as unknown as HostWindow).resumedClosed)).toBe(
+      resumedClosed,
+    );
+    expect(errors).toEqual([]);
+  }, 30_000);
+
+  test.each(["stop", "destroy"])(
+    "%s cancels paused startup navigation",
+    async (action) => {
+      await page.evaluate(() => (window as unknown as HostWindow).mountPlayer());
+      const entered = Promise.withResolvers<void>();
+      const released = Promise.withResolvers<void>();
+      await page.route("**/engine.wasm", async (route) => {
+        entered.resolve();
+        await released.promise;
+        await route.continue();
+      });
+      try {
+        expect(await hostRun("play", "playerApp")).toBe(true);
+        await entered.promise;
+        expect(await hostRun("pause", "playerApp")).toBe(true);
+        expect(await hostRun("next", "playerApp")).toBe(true);
+        await player.locator(".seek").evaluate((seek: HTMLInputElement) => {
+          seek.value = "30";
+          seek.dispatchEvent(new Event("change"));
+        });
+        if (action === "stop") expect(await hostRun("stop", "playerApp")).toBe(true);
+        else await page.evaluate(() => (window as unknown as HostWindow).playerApp?.destroy());
+        released.resolve();
+        await page.waitForTimeout(1_700);
+        expect(await state("playerApp")).toMatchObject({ playing: false, paused: false });
+        if (action === "stop") {
+          expect(await player.locator(".time").textContent()).toBe("0:00");
+          expect(await hostRun("play", "playerApp")).toBe(true);
+          await page.waitForFunction(
+            () =>
+              (window as unknown as HostWindow).shadow("player").querySelector(".time")
+                ?.textContent !== "0:00",
+          );
+          expect(Number(await player.locator(".seek").inputValue())).toBeLessThan(3);
+        } else {
+          expect(
+            await page.evaluate(() =>
+              (window as unknown as HostWindow).contexts.every(
+                (context) => context.state === "closed",
+              ),
+            ),
+          ).toBe(true);
+          expect(await hostRun("play", "playerApp")).toBe(false);
+        }
+        expect(errors).toEqual([]);
+      } finally {
+        released.resolve();
+        await page.unroute("**/engine.wasm");
+        await page.evaluate(() => (window as unknown as HostWindow).playerApp?.destroy());
+      }
+    },
+    30_000,
+  );
+
   test("without their own action buttons, the apps keep their other controls and shortcuts, side by side", async () => {
     const measure = () =>
       page.evaluate(() => {

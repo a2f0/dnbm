@@ -110,6 +110,9 @@ back into this skill instead of accumulating session journals.
 
 ## Verification and pitfalls
 
+- For paused transport, assert AudioContext state, resume calls and a frozen clock
+  over a negative window, then verify the requested engine slot after explicit
+  resume. A paused label alone misses audio restarts and pending-start races.
 - PolyBLEP oscillators already exist; distortion after them can still alias.
 - Decay is time to -60 dB, not one exponential time constant. Don't globally
   lengthen envelopes without intending to alter every voice and filter contour.
