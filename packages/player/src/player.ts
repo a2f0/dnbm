@@ -55,7 +55,7 @@ export class Player {
   private readonly playlist: Playlist;
   private host: EngineHost | undefined;
   private starting: Promise<EngineHost | undefined> | undefined;
-  /** The song shown on the display, and playing unless stopped. */
+  /** The selected song; a paused selection may differ from the engine's loaded song. */
   private current = 0;
   /** The song the engine holds, once one has been sent to it. */
   private loaded: number | undefined;
@@ -64,8 +64,8 @@ export class Player {
   private step = 0;
   /** After a play or seek, positions are stale until the engine reports this slot's first step. */
   private awaitingSlot: number | undefined;
-  /** Where play starts from when stopped, after a seek while stopped. */
-  private startSlot = 0;
+  /** The selected slot to start on the next play, distinct from the suspended engine. */
+  private queuedSlot = 0;
   /** Whether the engine was told to play the current song since it last stopped. */
   private started = false;
   /**
@@ -323,6 +323,9 @@ export class Player {
     this.starting ??= EngineHost.start(wasmUrl, workletUrl, signal).then(
       (host) => {
         this.host = host;
+        // Pause may have arrived before there was a host to suspend. Do not start
+        // or briefly resume the queued song when initialization finishes.
+        if (this.state === "paused") void host.context.suspend();
         host.setVolume(this.gain());
         host.onPosition = (position) => this.position(position);
         host.onError = (message) => this.fail(message);
@@ -341,7 +344,7 @@ export class Player {
 
   /**
    * Plays a song from the start, or resumes: from a pause, or from where a seek left
-   * the stopped song. Without an index, plays the current song.
+   * the paused or stopped selection. Without an index, plays the current song.
    */
   async play(index?: number): Promise<void> {
     if (this.songs.length === 0) return;
@@ -353,8 +356,8 @@ export class Player {
       return;
     }
     if (index !== undefined) this.current = index;
-    // A seek while stopped sets where play starts; anything else starts the song over.
-    if (index !== undefined || this.state === "playing") this.startSlot = 0;
+    // Explicit song selection or play while playing restarts; otherwise keep the queue.
+    if (index !== undefined || this.state === "playing") this.queuePosition(0);
     this.state = "playing";
     this.render();
     const host = await this.engine();
@@ -363,8 +366,9 @@ export class Player {
     if (!host) {
       this.state = "stopped";
       this.render();
-    } else if (this.state === "playing") {
-      this.start(host, this.startSlot);
+    } else if (this.state === "playing" && !this.started && !this.tail) {
+      // Several play requests can await the same startup; consume the queue once.
+      this.start(host, this.queuedSlot);
     }
   }
 
@@ -380,7 +384,7 @@ export class Player {
     this.step = this.timelines[this.current]?.slotSteps[slot] ?? 0;
     this.started = true;
     host.play(PlayMode.SongOnce, slot);
-    this.startSlot = 0;
+    this.queuedSlot = 0;
     this.render();
   }
 
@@ -407,7 +411,7 @@ export class Player {
     this.host?.stop();
     this.state = "stopped";
     this.step = 0;
-    this.startSlot = 0;
+    this.queuedSlot = 0;
     this.awaitingSlot = undefined;
     this.render();
   }
@@ -429,26 +433,31 @@ export class Player {
 
   /** Moves to a song, playing it if the player is playing. */
   private skipTo(index: number): void {
-    if (this.state === "stopped") {
+    if (this.state !== "playing") {
       this.current = index;
-      this.step = 0;
-      this.startSlot = 0;
-      this.render();
+      this.queuePosition(0);
     } else {
       void this.play(index);
     }
+  }
+
+  /** Selects a position without resuming audio or accepting the old engine's reports. */
+  private queuePosition(slot: number): void {
+    this.clearTail();
+    this.started = false;
+    this.awaitingSlot = undefined;
+    this.queuedSlot = slot;
+    this.step = this.timelines[this.current]?.slotSteps[slot] ?? 0;
+    this.render();
   }
 
   private seekTo(seconds: number): void {
     const line = this.timelines[this.current];
     if (!line) return;
     const slot = slotAt(line, seconds);
-    if (this.state === "stopped") {
-      this.startSlot = slot;
-      this.step = line.slotSteps[slot] ?? 0;
-      this.render();
-    } else if (this.host) {
-      this.state = "playing";
+    if (this.state !== "playing" || !this.host) {
+      this.queuePosition(slot);
+    } else {
       this.start(this.host, slot);
     }
   }

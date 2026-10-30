@@ -203,6 +203,11 @@ class names. Each instance has three more members:
 | `previous`, `next`              | Moves to the previous or next song, playing it if playing; past a song's first three seconds, `previous` restarts it (Z, B) |
 | `toggleShuffle`, `toggleRepeat` | Turns shuffle or repeat on or off (S, R)                                                                                    |
 
+Paused player navigation (`previous`, `next`, or the seek control) selects a song
+and arrangement slot without resuming audio. `play` or `togglePlay` resumes from
+that selection; the host's `pause` command is unavailable while already paused.
+Stopped navigation stays stopped, while navigation during playback keeps playing.
+
 The sequencer's state (`DnbmSequencerState`) holds `playing`, the song's `title`, the
 `fileName` it opened from or saves to, `dirty` for unsaved changes, and `available`,
 whether `run` takes each command now. The player's (`DnbmPlayerState`) holds
