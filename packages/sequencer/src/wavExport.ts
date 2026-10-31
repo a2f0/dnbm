@@ -39,9 +39,16 @@ export interface WavExport {
   onProgress(fraction: number): void;
 }
 
+interface RenderedWav {
+  readonly wav: ArrayBuffer;
+  /** Captured with the worker's score, not read from the editor when rendering ends. */
+  readonly title: string;
+}
+
 /**
- * Renders the song to WAV bytes. Resolves undefined, starting no worker, when the app
- * went while the engine loaded; rejects with the signal's reason when it goes later.
+ * Renders the song to WAV bytes and its captured title. Resolves undefined, starting
+ * no worker, when the app went while the engine loaded; rejects with the signal's
+ * reason when it goes later.
  */
 export async function renderWav({
   engine,
@@ -49,21 +56,22 @@ export async function renderWav({
   song,
   signal,
   onProgress,
-}: WavExport): Promise<ArrayBuffer | undefined> {
+}: WavExport): Promise<RenderedWav | undefined> {
   const wasm = await fetch(engine, { signal }).then((response) => response.arrayBuffer());
   // Gone while the engine loaded: start no worker, which an abort that already
   // happened would never stop.
   if (signal.aborted) return undefined;
   const { worker, end } = moduleWorker(script);
   const request: RenderRequest = { wasm, song: song(), sampleRate: 48_000 };
+  const title = request.song.title;
   let stop = () => {};
-  return new Promise<ArrayBuffer>((resolve, reject) => {
+  return new Promise<RenderedWav>((resolve, reject) => {
     stop = () => reject(signal.reason);
     signal.addEventListener("abort", stop, { once: true });
     worker.onmessage = (event: MessageEvent<RenderReply>) => {
       const reply = event.data;
       if (reply.type === "progress") onProgress(reply.fraction);
-      else if (reply.type === "done") resolve(reply.wav);
+      else if (reply.type === "done") resolve({ wav: reply.wav, title });
       else reject(new Error(reply.message));
     };
     worker.onerror = (event) => reject(new Error(event.message));

@@ -21,5 +21,9 @@ song playback turns follow off so you can edit ahead. Muted channels and channel
 excluded by solo dim in the mixer. The master holds its highest peak in dBFS; click
 that reading to reset it, or start playback for a fresh reading.
 
+**export** saves the song as it is when rendering starts, after the engine loads.
+Later title edits or example selections cannot change that export's name or audio.
+Each export keeps its own identity, even when several are running.
+
 [Architecture](../../docs/architecture.md#the-sequencer-packagessequencer) describes how
 the editor is built.

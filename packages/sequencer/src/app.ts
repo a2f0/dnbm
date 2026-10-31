@@ -436,16 +436,16 @@ export class App implements Editor {
     const { signal } = this.environment;
     this.say("Rendering…");
     try {
-      const wav = await renderWav({
+      const rendered = await renderWav({
         engine: this.asset("engine.wasm"),
         worker: this.asset("renderWorker.js"),
         song: () => this.song,
         signal,
         onProgress: (fraction) => this.say(`Rendering… ${Math.round(fraction * 100)}%`),
       });
-      if (wav === undefined || signal.aborted) return;
-      const name = songFileName(this.song.title).replace(/\.dnbm\.json$/, ".wav");
-      download(new Blob([wav], { type: "audio/wav" }), name);
+      if (rendered === undefined || signal.aborted) return;
+      const name = songFileName(rendered.title).replace(/\.dnbm\.json$/, ".wav");
+      download(new Blob([rendered.wav], { type: "audio/wav" }), name);
       this.say(`Exported ${name}.`);
     } catch (error) {
       if (signal.aborted) return;

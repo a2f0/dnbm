@@ -42,6 +42,32 @@ claimed as a listening benchmark.
 | MF-007 | Channel gain/filter edit smoothing still uses block endpoints                    | Medium: live mixer-edit parity is narrower than static-song parity                                              | open            | Reproduce fixed-sample channel edits; design block-independent smoothing with measured CPU cost before extending MF-002's guarantee                                                               |
 | MF-008 | Corrosion low-frequency/DC offset; [diagnostic](#low-frequency-offset-follow-up) | Medium: preserve bass headroom without assuming a listening defect                                              | open            | Isolate per-channel and nonlinear-stage DC, then evaluate a bounded correction with bass/transient tests and matched listening                                                                    |
 | MF-009 | Paused seek and Previous/Next resumed audio instead of selecting a position      | High: navigation must not unexpectedly restart listening                                                        | verified        | [Browser regressions](../packages/player/test/player.test.ts) verify silent queued navigation, startup and tails; host tests cover stop/dispose. DSP/scores and musical acceptance are unchanged. |
+| MF-010 | WAV name followed later editor selection; [identity](#wav-export-identity)       | High: downloaded filenames must identify their audio                                                            | verified        | Packed-browser barriers check filename/byte identity through selection, title edits, engine loading and overlapping renders; abort/failure cleanup and unchanged audio are covered.               |
+
+## WAV export identity
+
+The renderer reads the score once after the engine fetch, immediately before
+posting it to the worker. Preserve that boundary: edits or example selections
+during engine loading apply to the export. Capture the title from that same score
+and return it with the WAV bytes; never derive the filename from the editor after
+the render await. Later edits must not rename earlier audio, and concurrent
+exports each retain their own identity. No public commands, song format or DSP
+change is needed.
+
+[test/package/exportIdentity.test.ts](../test/package/exportIdentity.test.ts)
+exercises the packed app in real Chrome. Its entered/release barriers hold the
+engine's byte-read completion and delivery of actual worker terminal replies;
+CPU throttling or sleeps are not evidence of ordering. Verify the real download's
+name and SHA-256 against both the recorded worker reply and an independent render
+of the captured example. Include title edits, selection across both boundaries,
+reverse completion of concurrent exports, failure cleanup/retry, and destruction
+before capture and before delivery (no late download). Negative observation
+windows may use bounded waits after the deterministic action.
+
+Retain deployed revision/asset identity, red/green logs and downloaded WAV hashes
+in a new `.fidelity/` pass and the PR. After deployment, repeat the Wraith export
+while selecting Undertow and compare the bytes to the retained Wraith reference.
+This proves file identity, not perceived sound or visual quality.
 
 ## Reproducible comparisons
 
