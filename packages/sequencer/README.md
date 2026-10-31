@@ -9,6 +9,12 @@ TypeScript and DOM with no framework, built on the shared synthesizer in `packag
 Run it from the repository root with `bun run dev` (`http://localhost:8174`); the
 [root README](../../README.md#quick-start) has the setup.
 
+## WAV export
+
+**export** renders the score selected when the engine finishes loading. Its WAV
+filename comes from that same score's title, even if you select another example
+or edit the title while rendering. Each export keeps its own name and audio.
+
 ## Using the editor
 
 The editor opens on **Undertow**. Press space to play. The browser restores your last

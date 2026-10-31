@@ -113,6 +113,13 @@ back into this skill instead of accumulating session journals.
 - For paused transport, assert AudioContext state, resume calls and a frozen clock
   over a negative window, then verify the requested engine slot after explicit
   resume. A paused label alone misses audio restarts and pending-start races.
+- For asynchronous WAV export, preserve the score getter's after-engine-fetch
+  boundary and capture title with that score. Gate real worker reply delivery with
+  entered/release barriers, then change selection/title and verify actual download
+  name plus exact bytes against worker input and a reference render. Cover engine
+  loading, reverse-order concurrent exports, abort and failure cleanup; sleeps or
+  CPU throttling alone do not prove the race ordering. Keep live revision/hash and
+  red/green receipts in a new .fidelity pass, not this skill.
 - PolyBLEP oscillators already exist; distortion after them can still alias.
 - Decay is time to -60 dB, not one exponential time constant. Don't globally
   lengthen envelopes without intending to alter every voice and filter contour.
