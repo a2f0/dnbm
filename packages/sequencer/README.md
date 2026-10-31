@@ -9,12 +9,6 @@ TypeScript and DOM with no framework, built on the shared synthesizer in `packag
 Run it from the repository root with `bun run dev` (`http://localhost:8174`); the
 [root README](../../README.md#quick-start) has the setup.
 
-## WAV export
-
-**export** renders the score selected when the engine finishes loading. Its WAV
-filename comes from that same score's title, even if you select another example
-or edit the title while rendering. Each export keeps its own name and audio.
-
 ## Using the editor
 
 The editor opens on **Undertow**. Press space to play. The browser restores your last
@@ -26,6 +20,10 @@ Click an arrangement slot to start there, or choose **loop** to work on one patt
 song playback turns follow off so you can edit ahead. Muted channels and channels
 excluded by solo dim in the mixer. The master holds its highest peak in dBFS; click
 that reading to reset it, or start playback for a fresh reading.
+
+**export** saves the song as it is when rendering starts, after the engine loads.
+Later title edits or example selections cannot change that export's name or audio.
+Each export keeps its own identity, even when several are running.
 
 [Architecture](../../docs/architecture.md#the-sequencer-packagessequencer) describes how
 the editor is built.
