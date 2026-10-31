@@ -81,6 +81,7 @@ function instrumentExports(): void {
       transfer: Transferable[] | StructuredSerializeOptions = [],
     ): void {
       this.record.request = { song: structuredClone(message.song), sampleRate: message.sampleRate };
+      // Narrow the union for the browser API's two TypeScript overloads.
       if (Array.isArray(transfer)) super.postMessage(message, transfer);
       else super.postMessage(message, transfer);
     }
@@ -162,10 +163,14 @@ describe("WAV export identity in the packed app", () => {
       await Bun.file(join(installed, "site", "engine.wasm")).arrayBuffer(),
       48_000,
     );
-    const rendered = renderSong(engine, song);
-    const hash = sha256(encodeWav(rendered.left, rendered.right, rendered.sampleRate));
-    references.set(slug, hash);
-    return hash;
+    try {
+      const rendered = renderSong(engine, song);
+      const hash = sha256(encodeWav(rendered.left, rendered.right, rendered.sampleRate));
+      references.set(slug, hash);
+      return hash;
+    } finally {
+      engine.free();
+    }
   }
 
   async function verifyDownload(
@@ -318,6 +323,7 @@ describe("WAV export identity in the packed app", () => {
   }, 30_000);
 
   test("a real worker failure cleans up without downloading and the next export succeeds", async () => {
+    await selectSong("Undertow");
     const downloads: string[] = [];
     const record = (download: Download) => downloads.push(download.suggestedFilename());
     page.on("download", record);
@@ -343,6 +349,7 @@ describe("WAV export identity in the packed app", () => {
   }, 30_000);
 
   test("engine fetch failure starts no worker and does not poison the next export", async () => {
+    await selectSong("Undertow");
     await page.route("**/engine.wasm", (route) => route.abort("failed"));
     await page.locator('#window .files button:text-is("export")').click();
     await page.waitForFunction(() =>
