@@ -56,6 +56,12 @@ artifacts. The ordinary CI dry-run checks bundling without that remote proof.
 
 ## Release tools
 
+Keep the publisher's explicit `actions/setup-node` `node-version` and its npm
+version comment aligned with `.mise.toml`. The trusted publish job deliberately
+has no checkout, so it cannot read the mise pin. Verify the selected Node's
+bundled npm still supports trusted publishing; a local build alone does not
+exercise this separate runtime.
+
 Keep the npm pack job's mise cache disabled. Its output is the artifact consumed
 by the trusted publisher; restoring tools from a lower-trust cache can alter that
 artifact. This follows the

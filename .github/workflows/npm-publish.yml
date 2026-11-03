@@ -106,11 +106,11 @@ jobs:
         with:
           name: npm-package
           path: package
-      # Trusted publishing needs npm 11.5.1 or later; Node 26.12.1 ships 11.20.0. No
+      # Trusted publishing needs npm 11.5.1 or later; Node 26.13.0 ships 11.20.0. No
       # registry-url: its .npmrc would point npm at an empty NODE_AUTH_TOKEN.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26.12.1
+          node-version: 26.13.0
           package-manager-cache: false
       # The ./ matters: npm reads a bare `package/<file>.tgz` as a GitHub owner/repo
       # shorthand and tries to clone it.
