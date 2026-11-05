@@ -11,6 +11,15 @@ import { h, icon, setText } from "./dom";
 import { Playlist } from "./playlist";
 import { Spectrum } from "./spectrum";
 import { clock, slotAt, stepAt, type Timeline, timeline } from "./timeline";
+import {
+  counting,
+  pendingStart,
+  resumable,
+  STOPPED,
+  type Transport,
+  type TransportEvent,
+  transition,
+} from "./transport";
 
 export interface PlayerOptions {
   /** The engine module. */
@@ -30,10 +39,6 @@ export interface PlayerOptions {
   readonly onState?: ((state: DnbmPlayerState) => void) | undefined;
 }
 
-type State = "stopped" | "playing" | "paused";
-
-/** How long a finished song rings out before the next one starts. */
-const TAIL_MS = 1500;
 /** Within this many seconds of a song's start, previous goes to the song before. */
 const RESTART_SECONDS = 3;
 const DEFAULT_VOLUME = 80;
@@ -59,22 +64,12 @@ export class Player {
   private current = 0;
   /** The song the engine holds, once one has been sent to it. */
   private loaded: number | undefined;
-  private state: State = "stopped";
+  /** Stopped, playing or paused, and where the engine is; only `send` changes it. */
+  private transport: Transport = STOPPED;
   /** The step playing, counted from the start of the song. */
   private step = 0;
-  /** After a play or seek, positions are stale until the engine reports this slot's first step. */
-  private awaitingSlot: number | undefined;
-  /** The selected slot to start on the next play, distinct from the suspended engine. */
-  private queuedSlot = 0;
-  /** Whether the engine was told to play the current song since it last stopped. */
-  private started = false;
-  /**
-   * After a song ends, while its reverb and delay ring out before the next starts. The
-   * wait holds while paused, so it keeps what is left of it.
-   */
-  private tail:
-    | { remaining: number; since: number; timer: ReturnType<typeof setTimeout> | undefined }
-    | undefined;
+  /** Runs while an ending's wait counts (`counting`), then moves on to the next song. */
+  private tailTimer: ReturnType<typeof setTimeout> | undefined;
   private seeking = false;
   private showRemaining = false;
 
@@ -98,7 +93,7 @@ export class Player {
     options.signal.addEventListener(
       "abort",
       () => {
-        this.clearTail();
+        this.send({ type: "elapse" });
         this.host = undefined;
       },
       { once: true },
@@ -253,7 +248,7 @@ export class Player {
       b: () => this.next(),
       s: () => this.toggleShuffle(),
       r: () => this.toggleRepeat(),
-      " ": () => (this.state === "playing" ? this.pause() : void this.play()),
+      " ": () => (this.mode === "playing" ? this.pause() : void this.play()),
     };
     // Space on a focused button presses it; leave that to the button.
     if (event.key === " " && event.target instanceof HTMLButtonElement) return;
@@ -263,15 +258,43 @@ export class Player {
     action();
   }
 
+  private get mode(): Transport["status"] {
+    return this.transport.status;
+  }
+
+  /**
+   * Applies a transport event, then runs the ending's timer exactly while its wait counts:
+   * leaving the ending, or pausing it, clears the timer.
+   */
+  private send(event: TransportEvent): void {
+    this.transport = transition(this.transport, event);
+    const wait = counting(this.transport);
+    if (!wait && this.tailTimer !== undefined) {
+      clearTimeout(this.tailTimer);
+      this.tailTimer = undefined;
+    } else if (wait && this.tailTimer === undefined && !this.options.signal.aborted) {
+      this.tailTimer = setTimeout(
+        () => {
+          this.tailTimer = undefined;
+          this.send({ type: "elapse" });
+          const next = this.playlist.next(this.current);
+          if (next === undefined) this.stop();
+          else void this.play(next);
+        },
+        Math.max(0, wait.remaining),
+      );
+    }
+  }
+
   /** Which of its commands the player takes now: none without songs, or once it goes. */
   private available(): Record<DnbmPlayerCommand, boolean> {
     const free = this.songs.length > 0 && !this.options.signal.aborted;
     return {
-      play: free && this.state !== "playing",
-      pause: free && this.state === "playing",
+      play: free && this.mode !== "playing",
+      pause: free && this.mode === "playing",
       togglePlay: free,
       // Stopped after a seek, stop still goes back to the start, as its button does.
-      stop: free && (this.state !== "stopped" || this.step !== 0),
+      stop: free && (this.mode !== "stopped" || this.step !== 0),
       previous: free,
       next: free,
       toggleShuffle: free,
@@ -282,8 +305,8 @@ export class Player {
   /** Tells the host the player's state, which the shell passes on only when it changed. */
   private publish(): void {
     this.options.onState?.({
-      playing: this.state === "playing",
-      paused: this.state === "paused",
+      playing: this.mode === "playing",
+      paused: this.mode === "paused",
       title: this.songs[this.current]?.title ?? "",
       shuffle: this.playlist.shuffle,
       repeat: this.playlist.repeat,
@@ -301,7 +324,7 @@ export class Player {
     const actions: Record<DnbmPlayerCommand, () => void> = {
       play: () => void this.play(),
       pause: () => this.pause(),
-      togglePlay: () => (this.state === "playing" ? this.pause() : void this.play()),
+      togglePlay: () => (this.mode === "playing" ? this.pause() : void this.play()),
       stop: () => this.stop(),
       previous: () => this.previous(),
       next: () => this.next(),
@@ -325,7 +348,7 @@ export class Player {
         this.host = host;
         // Pause may have arrived before there was a host to suspend. Do not start
         // or briefly resume the queued song when initialization finishes.
-        if (this.state === "paused") void host.context.suspend();
+        if (this.mode === "paused") void host.context.suspend();
         host.setVolume(this.gain());
         host.onPosition = (position) => this.position(position);
         host.onError = (message) => this.fail(message);
@@ -348,8 +371,8 @@ export class Player {
    */
   async play(index?: number): Promise<void> {
     if (this.songs.length === 0) return;
-    if (index === undefined && this.state === "paused" && (this.started || this.tail)) {
-      this.state = "playing";
+    if (index === undefined && resumable(this.transport)) {
+      this.send({ type: "play" });
       void this.host?.context.resume();
       this.waitForTail();
       this.render();
@@ -357,62 +380,54 @@ export class Player {
     }
     if (index !== undefined) this.current = index;
     // Explicit song selection or play while playing restarts; otherwise keep the queue.
-    if (index !== undefined || this.state === "playing") this.queuePosition(0);
-    this.state = "playing";
+    if (index !== undefined || this.mode === "playing") this.queuePosition(0);
+    this.send({ type: "play" });
     this.render();
     const host = await this.engine();
     // The player may have gone while the engine was awaited.
     if (this.options.signal.aborted) return;
     if (!host) {
-      this.state = "stopped";
+      this.send({ type: "fail" });
       this.render();
-    } else if (this.state === "playing" && !this.started && !this.tail) {
-      // Several play requests can await the same startup; consume the queue once.
-      this.start(host, this.queuedSlot);
+      return;
     }
+    // Several play requests can await the same startup; consume the queue once.
+    const slot = pendingStart(this.transport);
+    if (slot !== undefined) this.start(host, slot);
   }
 
+  /** Tells the engine to play the selected song from `slot`; only while playing. */
   private start(host: EngineHost, slot: number): void {
-    this.clearTail();
+    if (this.mode !== "playing") return;
     const song = this.songs[this.current];
     if (!song) return;
     if (this.loaded !== this.current) {
       host.loadSong(song);
       this.loaded = this.current;
     }
-    this.awaitingSlot = slot;
+    this.send({ type: "start", slot });
     this.step = this.timelines[this.current]?.slotSteps[slot] ?? 0;
-    this.started = true;
     host.play(PlayMode.SongOnce, slot);
-    this.queuedSlot = 0;
     this.render();
   }
 
   /** Pauses, or resumes from a pause. */
   pause(): void {
-    if (this.state === "paused") {
+    if (this.mode === "paused") {
       void this.play();
-    } else if (this.state === "playing") {
-      this.state = "paused";
+    } else if (this.mode === "playing") {
+      this.send({ type: "pause", now: performance.now() });
       void this.host?.context.suspend();
-      if (this.tail?.timer !== undefined) {
-        clearTimeout(this.tail.timer);
-        this.tail.timer = undefined;
-        this.tail.remaining -= performance.now() - this.tail.since;
-      }
       this.render();
     }
   }
 
   stop(): void {
-    this.clearTail();
-    this.started = false;
-    if (this.state === "paused") void this.host?.context.resume();
+    const paused = this.mode === "paused";
+    this.send({ type: "stop" });
+    if (paused) void this.host?.context.resume();
     this.host?.stop();
-    this.state = "stopped";
     this.step = 0;
-    this.queuedSlot = 0;
-    this.awaitingSlot = undefined;
     this.render();
   }
 
@@ -423,7 +438,7 @@ export class Player {
 
   previous(): void {
     const elapsed = this.step * (this.timelines[this.current]?.stepSeconds ?? 0);
-    if (this.state !== "stopped" && elapsed > RESTART_SECONDS) {
+    if (this.mode !== "stopped" && elapsed > RESTART_SECONDS) {
       this.skipTo(this.current);
       return;
     }
@@ -433,7 +448,7 @@ export class Player {
 
   /** Moves to a song, playing it if the player is playing. */
   private skipTo(index: number): void {
-    if (this.state !== "playing") {
+    if (this.mode !== "playing") {
       this.current = index;
       this.queuePosition(0);
     } else {
@@ -443,10 +458,7 @@ export class Player {
 
   /** Selects a position without resuming audio or accepting the old engine's reports. */
   private queuePosition(slot: number): void {
-    this.clearTail();
-    this.started = false;
-    this.awaitingSlot = undefined;
-    this.queuedSlot = slot;
+    this.send({ type: "queue", slot });
     this.step = this.timelines[this.current]?.slotSteps[slot] ?? 0;
     this.render();
   }
@@ -455,7 +467,7 @@ export class Player {
     const line = this.timelines[this.current];
     if (!line) return;
     const slot = slotAt(line, seconds);
-    if (this.state !== "playing" || !this.host) {
+    if (this.mode !== "playing" || !this.host) {
       this.queuePosition(slot);
     } else {
       this.start(this.host, slot);
@@ -473,45 +485,28 @@ export class Player {
   }
 
   private position(position: PlayingPosition): void {
-    if (!this.started) return;
-    // Reports sent before the engine took the last play or seek are stale.
-    if (this.awaitingSlot !== undefined) {
-      if (!position.playing || position.slot !== this.awaitingSlot || position.step !== 0) return;
-      this.awaitingSlot = undefined;
-    }
+    const before = this.transport.engine.phase;
+    const { playing, slot, step } = position;
+    // The transport drops reports sent before the engine took the last play or seek.
+    this.send({ type: "report", playing, slot, step });
+    const { phase } = this.transport.engine;
     const line = this.timelines[this.current];
     if (!line) return;
-    if (position.playing) {
-      this.step = stepAt(line, position.slot, position.step);
-    } else {
-      // The engine plays a song once, and stopped as its last step ended.
-      this.started = false;
+    if (phase === "running") {
+      this.step = stepAt(line, slot, step);
+    } else if (phase === "ending" && before === "running") {
       this.step = line.steps;
-      this.tail = { remaining: TAIL_MS, since: 0, timer: undefined };
-      if (this.state === "playing") this.waitForTail();
+      this.waitForTail();
+    } else {
+      return;
     }
     this.render();
   }
 
-  /** Lets what is left of the tail ring out, then moves on to the next song. */
+  /** Lets what is left of an ending ring out while playing, then moves on to the next song. */
   private waitForTail(): void {
-    const tail = this.tail;
-    if (!tail || tail.timer !== undefined || this.options.signal.aborted) return;
-    tail.since = performance.now();
-    tail.timer = setTimeout(
-      () => {
-        this.tail = undefined;
-        const next = this.playlist.next(this.current);
-        if (next === undefined) this.stop();
-        else void this.play(next);
-      },
-      Math.max(0, tail.remaining),
-    );
-  }
-
-  private clearTail(): void {
-    clearTimeout(this.tail?.timer);
-    this.tail = undefined;
+    if (this.options.signal.aborted) return;
+    this.send({ type: "wait", now: performance.now() });
   }
 
   private fail(message: string): void {
@@ -534,10 +529,10 @@ export class Player {
     }
     const bars = line.steps / STEPS_PER_BAR;
     setText(this.details, `${song.bpm} bpm · ${bars} bars`);
-    this.element.dataset["state"] = this.state;
-    this.element.toggleAttribute("data-ending", this.tail !== undefined);
-    this.buttons.play.setAttribute("aria-pressed", String(this.state === "playing"));
-    this.buttons.pause.setAttribute("aria-pressed", String(this.state === "paused"));
+    this.element.dataset["state"] = this.mode;
+    this.element.toggleAttribute("data-ending", this.transport.engine.phase === "ending");
+    this.buttons.play.setAttribute("aria-pressed", String(this.mode === "playing"));
+    this.buttons.pause.setAttribute("aria-pressed", String(this.mode === "paused"));
     this.buttons.shuffle.setAttribute("aria-pressed", String(this.playlist.shuffle));
     this.buttons.repeat.setAttribute("aria-pressed", String(this.playlist.repeat));
     for (const [index, row] of this.rows.entries()) {
