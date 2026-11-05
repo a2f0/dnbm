@@ -142,6 +142,13 @@ lets the reverb and delay ring out and starts the next song. Pause suspends the
 AudioContext, which stops the engine mid-step and resumes it exactly there, and holds
 what is left of a ring-out.
 
+`transport.ts` is the player's transport as one state machine: stopped, playing or
+paused, and inside it where the engine is with the selected song (queued at a slot,
+starting from one, running, or ringing out). Its pure `transition` is the only writer,
+and it drops engine reports that predate the last play, seek or selection; `Player`
+does the audio, timer and display work around each event. Change a transport rule
+there, with its table in `test/transport.test.ts`.
+
 ## Adding an instrument
 
 1. Add the voice in `packages/synth/engine/src/instruments/`, a variant to `InstrumentKind` and
