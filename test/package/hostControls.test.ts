@@ -220,6 +220,16 @@ describe("the packaged app driven by its host's controls", () => {
     expect(await state()).toMatchObject({ playing: true, available: { play: false, stop: true } });
     expect(await sequencer.locator(".play").getAttribute("aria-label")).toBe("Stop");
     expect(await hostRun("play")).toBe(false);
+    // Stop and play again in one task: the stop's position report, which arrives after
+    // the play, must not show the restarted song as stopped.
+    const restarted = await page.evaluate(() => {
+      const app = (window as unknown as HostWindow).sequencerApp;
+      return [app?.run("stop"), app?.run("play")];
+    });
+    expect(restarted).toEqual([true, true]);
+    await page.waitForTimeout(500);
+    expect(await state()).toMatchObject({ playing: true, available: { play: false, stop: true } });
+    await sequencer.locator(".cell.now").first().waitFor({ timeout: 10_000 });
     expect(await hostRun("stop")).toBe(true);
     await page.waitForFunction(
       () => !(window as unknown as HostWindow).sequencerApp?.state.playing,
