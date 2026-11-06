@@ -24,7 +24,7 @@ export function mount(
   frame.append(app);
   root.append(frame);
   // The last session's song, or the example song on a first visit.
-  const { song, saved, problem } = restoreSong(() => parseSong(undertow));
+  const { song, saved, autosave, problem } = restoreSong(() => parseSong(undertow));
   const editor = new App(app, song, saved, {
     frame,
     root,
@@ -33,6 +33,7 @@ export function mount(
     onTitle,
     actions: actions !== false,
     onState,
+    autosave,
   });
   if (problem) editor.say(problem, true);
   return { run: (command) => editor.run(command) };

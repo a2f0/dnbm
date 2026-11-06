@@ -285,10 +285,11 @@ export class App implements Editor {
    * Saves the song to local storage on every change, never later: an embedding host
    * can destroy the app at any moment, and a delayed write would be lost. Once the app
    * is gone it writes nothing, so a file picker or a drop that outlives it can't
-   * overwrite what the app mounted in its place saves.
+   * overwrite what the app mounted in its place saves. Nor does it write over a last
+   * song it couldn't reopen and had no room to copy aside (storage.ts).
    */
   private autosave(): void {
-    if (this.gone) return;
+    if (this.gone || !this.environment.autosave) return;
     writeStorage(AUTOSAVE_KEY, serializeSong(this.song));
     writeStorage(SAVED_KEY, this.store.saved);
   }

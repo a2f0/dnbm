@@ -17,12 +17,16 @@ const scope = globalThis as Record<string, unknown>;
 let original: unknown;
 let had = false;
 
-/** A browser storage area held in a map. */
-function memoryStorage(): Pick<Storage, "getItem" | "setItem"> {
+/** A browser storage area held in a map, full for the keys in `full`. */
+function memoryStorage(full: readonly string[] = []): Pick<Storage, "getItem" | "setItem"> {
   const items = new Map<string, string>();
   return {
     getItem: (key) => items.get(key) ?? null,
-    setItem: (key, value) => void items.set(key, value),
+    setItem: (key, value) => {
+      if (full.includes(key))
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      items.set(key, value);
+    },
   };
 }
 
@@ -52,6 +56,7 @@ describe("restoring the last song", () => {
     const restored = restoreSong(fallback);
     expect(restored.song.title).toBe("Last Session");
     expect(restored.saved).toBe("saved text");
+    expect(restored.autosave).toBe(true);
     expect(restored.problem).toBeUndefined();
   });
 
@@ -59,6 +64,7 @@ describe("restoring the last song", () => {
     const restored = restoreSong(fallback);
     expect(restored.song.title).toBe("Example");
     expect(restored.saved).toBeUndefined();
+    expect(restored.autosave).toBe(true);
     expect(restored.problem).toBeUndefined();
     expect(readStorage(UNREADABLE_KEY)).toBeNull();
   });
@@ -71,10 +77,24 @@ describe("restoring the last song", () => {
     const restored = restoreSong(fallback);
     expect(restored.song.title).toBe("Example");
     expect(restored.saved).toBeUndefined();
+    expect(restored.autosave).toBe(true);
     expect(restored.problem).toContain("song.dnbm");
     expect(restored.problem).toContain(UNREADABLE_KEY);
     // The editor autosaves its song on the first change.
     writeStorage(AUTOSAVE_KEY, serializeSong(restored.song));
     expect(readStorage(UNREADABLE_KEY)).toBe(newer);
+  });
+
+  test("turns autosave off when storage has no room to keep the unreadable song", () => {
+    scope["localStorage"] = memoryStorage([UNREADABLE_KEY]);
+    const newer = serializeSong(newSong()).replace('"dnbm": 1', '"dnbm": 2');
+    writeStorage(AUTOSAVE_KEY, newer);
+    const restored = restoreSong(fallback);
+    expect(restored.song.title).toBe("Example");
+    expect(restored.autosave).toBe(false);
+    expect(restored.problem).toContain("no room");
+    expect(restored.problem).not.toContain(`kept in browser storage`);
+    expect(readStorage(UNREADABLE_KEY)).toBeNull();
+    expect(readStorage(AUTOSAVE_KEY)).toBe(newer);
   });
 });

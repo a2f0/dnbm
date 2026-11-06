@@ -23,6 +23,8 @@ export interface Environment {
   readonly actions: boolean;
   /** Receives the app's state for its host whenever it may have changed. */
   readonly onState?: ((state: DnbmSequencerState) => void) | undefined;
+  /** False keeps the app from writing browser storage, which holds a song it can't read. */
+  readonly autosave: boolean;
 }
 
 /** The editor's state and actions that its panels read and call. */
