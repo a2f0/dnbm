@@ -119,9 +119,9 @@ The sequencer autosaves the open song to the host page's local storage under
 an earlier version on the same origin still opens. Every embed on that origin shares
 one autosaved song, and the host's pages can read it. An autosave the mounting version
 can't read, such as one a newer version wrote, is copied to `dnbm:song:unreadable`
-before the sequencer starts from its example song and autosaves over `dnbm:song`, and
-the status bar says so; when storage has no room for that copy, the session doesn't
-autosave at all. The player stores nothing.
+(or `dnbm:song:unreadable:2` and on, beside a different song kept there earlier) before
+the sequencer starts from its example song and autosaves over `dnbm:song`, and the
+status bar says so; when storage can't keep that copy, the session doesn't autosave. The player stores nothing.
 
 ### Content security policy and other origins
 

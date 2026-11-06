@@ -95,12 +95,29 @@ describe("restoring the last song", () => {
     writeStorage(SAVED_KEY, "newer saved");
     const restored = restoreSong(fallback);
     expect(restored.song.title).toBe("Example");
-    expect(restored.problem).toContain("no room");
+    expect(restored.problem).toContain("can't keep a copy");
     expect(restored.problem).not.toContain(`kept in browser storage`);
     expect(readStorage(UNREADABLE_KEY)).toBeNull();
     // The editor's autosaves on every change leave the only copy as it was.
     restored.autosave(serializeSong(restored.song), serializeSong(restored.song));
     expect(readStorage(AUTOSAVE_KEY)).toBe(newer);
     expect(readStorage(SAVED_KEY)).toBe("newer saved");
+  });
+
+  test("keeps a second unreadable song beside the first", () => {
+    const first = serializeSong(newSong()).replace('"dnbm": 1', '"dnbm": 2');
+    const second = first.replace('"dnbm": 2', '"dnbm": 3');
+    writeStorage(AUTOSAVE_KEY, first);
+    restoreSong(fallback).autosave("an edit", "an edit");
+    writeStorage(AUTOSAVE_KEY, second);
+    const restored = restoreSong(fallback);
+    expect(restored.problem).toContain(`${UNREADABLE_KEY}:2`);
+    restored.autosave("another edit", "another edit");
+    expect(readStorage(UNREADABLE_KEY)).toBe(first);
+    expect(readStorage(`${UNREADABLE_KEY}:2`)).toBe(second);
+    // The same unreadable song again keeps its one copy.
+    writeStorage(AUTOSAVE_KEY, second);
+    expect(restoreSong(fallback).problem).toContain(`${UNREADABLE_KEY}:2.`);
+    expect(readStorage(`${UNREADABLE_KEY}:3`)).toBeNull();
   });
 });

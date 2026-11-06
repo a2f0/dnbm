@@ -6,8 +6,12 @@ import type { Song } from "@a2f0/dnbm-synth/song/model";
 
 export const AUTOSAVE_KEY = "dnbm:song";
 export const SAVED_KEY = "dnbm:saved";
-/** Where an autosave this version can't read is kept, since the next autosave replaces it. */
+/**
+ * Where an autosave this version can't read is kept, since the next autosave replaces it:
+ * this key, then `dnbm:song:unreadable:2` and on for different songs, up to `MAX_KEPT`.
+ */
 export const UNREADABLE_KEY = "dnbm:song:unreadable";
+const MAX_KEPT = 10;
 
 /** Reads browser storage, which can throw (private windows, blocked storage). */
 export function readStorage(key: string): string | null {
@@ -27,6 +31,21 @@ export function writeStorage(key: string, value: string): boolean {
     // Storage is a convenience; the song still lives in memory and in saved files.
     return false;
   }
+}
+
+/**
+ * Copies `text` to the first unreadable-song key that is free or already holds it, never
+ * over a different song kept earlier. Returns the key, or undefined if none could keep it.
+ */
+function keepAside(text: string): string | undefined {
+  for (let count = 1; count <= MAX_KEPT; count += 1) {
+    const key = count === 1 ? UNREADABLE_KEY : `${UNREADABLE_KEY}:${count}`;
+    const held = readStorage(key);
+    if (held === text) return key;
+    if (held === null)
+      return writeStorage(key, text) && readStorage(key) === text ? key : undefined;
+  }
+  return undefined;
 }
 
 /** Writes the editor's song and its saved text to browser storage. */
@@ -53,7 +72,7 @@ export interface RestoredSong {
  * Reopens the last session's song from browser storage, or starts from `fallback`. An
  * autosave this version can't read, such as one a newer dnbm wrote on the same site, is
  * copied aside, since the editor's next autosave overwrites it, and `problem` says so.
- * When storage has no room for the copy, the session doesn't autosave at all.
+ * When storage can't keep the copy, the session doesn't autosave at all.
  */
 export function restoreSong(fallback: () => Song): RestoredSong {
   const text = readStorage(AUTOSAVE_KEY);
@@ -66,19 +85,20 @@ export function restoreSong(fallback: () => Song): RestoredSong {
       };
     } catch (error) {
       const reason = `Couldn't reopen the last song: ${error instanceof SongError ? error.message : String(error)}.`;
-      if (writeStorage(UNREADABLE_KEY, text) && readStorage(UNREADABLE_KEY) === text) {
+      const kept = keepAside(text);
+      if (kept) {
         return {
           song: fallback(),
           saved: undefined,
           autosave: autosaveTo(true),
-          problem: `${reason} A copy is kept in browser storage as ${UNREADABLE_KEY}.`,
+          problem: `${reason} A copy is kept in browser storage as ${kept}.`,
         };
       }
       return {
         song: fallback(),
         saved: undefined,
         autosave: autosaveTo(false),
-        problem: `${reason} Browser storage has no room for a copy, so this session won't autosave over it.`,
+        problem: `${reason} Browser storage can't keep a copy, so this session won't autosave over it.`,
       };
     }
   }
