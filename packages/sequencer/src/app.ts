@@ -8,7 +8,6 @@ import type { Pattern, Song, Track } from "@a2f0/dnbm-synth/song/model";
 import type { DnbmSequencerCommand } from "../../../src/control";
 import type { Editor, Environment } from "./editor";
 import { SongFiles } from "./songFiles";
-import { AUTOSAVE_KEY, SAVED_KEY, writeStorage } from "./storage";
 import { type ChangeSource, SongStore } from "./store";
 import { DevicePanel } from "./ui/device";
 import { Dialogs } from "./ui/dialog";
@@ -285,13 +284,11 @@ export class App implements Editor {
    * Saves the song to local storage on every change, never later: an embedding host
    * can destroy the app at any moment, and a delayed write would be lost. Once the app
    * is gone it writes nothing, so a file picker or a drop that outlives it can't
-   * overwrite what the app mounted in its place saves. Nor does it write over a last
-   * song it couldn't reopen and had no room to copy aside (storage.ts).
+   * overwrite what the app mounted in its place saves.
    */
   private autosave(): void {
-    if (this.gone || !this.environment.autosave) return;
-    writeStorage(AUTOSAVE_KEY, serializeSong(this.song));
-    writeStorage(SAVED_KEY, this.store.saved);
+    if (this.gone) return;
+    this.environment.autosave(serializeSong(this.song), this.store.saved);
   }
 
   /** Starts the audio engine on first use; browsers only allow it after a gesture. */

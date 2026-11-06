@@ -29,12 +29,23 @@ export function writeStorage(key: string, value: string): boolean {
   }
 }
 
-/** The song a session starts with, and why the last session's song didn't reopen. */
+/** Writes the editor's song and its saved text to browser storage. */
+export type Autosave = (song: string, saved: string) => void;
+
+function autosaveTo(storage: boolean): Autosave {
+  return (song, saved) => {
+    if (!storage) return;
+    writeStorage(AUTOSAVE_KEY, song);
+    writeStorage(SAVED_KEY, saved);
+  };
+}
+
+/** The song a session starts with, where it autosaves, and why the last didn't reopen. */
 export interface RestoredSong {
   readonly song: Song;
   readonly saved: string | undefined;
-  /** False when the session must not autosave, as that would destroy the last song. */
-  readonly autosave: boolean;
+  /** Writes nothing when writing would destroy the only copy of the last song. */
+  readonly autosave: Autosave;
   readonly problem?: string;
 }
 
@@ -51,7 +62,7 @@ export function restoreSong(fallback: () => Song): RestoredSong {
       return {
         song: parseSongText(text),
         saved: readStorage(SAVED_KEY) ?? undefined,
-        autosave: true,
+        autosave: autosaveTo(true),
       };
     } catch (error) {
       const reason = `Couldn't reopen the last song: ${error instanceof SongError ? error.message : String(error)}.`;
@@ -59,17 +70,17 @@ export function restoreSong(fallback: () => Song): RestoredSong {
         return {
           song: fallback(),
           saved: undefined,
-          autosave: true,
+          autosave: autosaveTo(true),
           problem: `${reason} A copy is kept in browser storage as ${UNREADABLE_KEY}.`,
         };
       }
       return {
         song: fallback(),
         saved: undefined,
-        autosave: false,
+        autosave: autosaveTo(false),
         problem: `${reason} Browser storage has no room for a copy, so this session won't autosave over it.`,
       };
     }
   }
-  return { song: fallback(), saved: undefined, autosave: true };
+  return { song: fallback(), saved: undefined, autosave: autosaveTo(true) };
 }

@@ -56,16 +56,19 @@ describe("restoring the last song", () => {
     const restored = restoreSong(fallback);
     expect(restored.song.title).toBe("Last Session");
     expect(restored.saved).toBe("saved text");
-    expect(restored.autosave).toBe(true);
     expect(restored.problem).toBeUndefined();
+    restored.autosave("next song", "next saved");
+    expect(readStorage(AUTOSAVE_KEY)).toBe("next song");
+    expect(readStorage(SAVED_KEY)).toBe("next saved");
   });
 
   test("starts from the fallback on a first visit", () => {
     const restored = restoreSong(fallback);
     expect(restored.song.title).toBe("Example");
     expect(restored.saved).toBeUndefined();
-    expect(restored.autosave).toBe(true);
     expect(restored.problem).toBeUndefined();
+    restored.autosave("next song", "next saved");
+    expect(readStorage(AUTOSAVE_KEY)).toBe("next song");
     expect(readStorage(UNREADABLE_KEY)).toBeNull();
   });
 
@@ -77,11 +80,11 @@ describe("restoring the last song", () => {
     const restored = restoreSong(fallback);
     expect(restored.song.title).toBe("Example");
     expect(restored.saved).toBeUndefined();
-    expect(restored.autosave).toBe(true);
     expect(restored.problem).toContain("song.dnbm");
     expect(restored.problem).toContain(UNREADABLE_KEY);
     // The editor autosaves its song on the first change.
-    writeStorage(AUTOSAVE_KEY, serializeSong(restored.song));
+    restored.autosave(serializeSong(restored.song), serializeSong(restored.song));
+    expect(readStorage(AUTOSAVE_KEY)).toBe(serializeSong(restored.song));
     expect(readStorage(UNREADABLE_KEY)).toBe(newer);
   });
 
@@ -89,12 +92,15 @@ describe("restoring the last song", () => {
     scope["localStorage"] = memoryStorage([UNREADABLE_KEY]);
     const newer = serializeSong(newSong()).replace('"dnbm": 1', '"dnbm": 2');
     writeStorage(AUTOSAVE_KEY, newer);
+    writeStorage(SAVED_KEY, "newer saved");
     const restored = restoreSong(fallback);
     expect(restored.song.title).toBe("Example");
-    expect(restored.autosave).toBe(false);
     expect(restored.problem).toContain("no room");
     expect(restored.problem).not.toContain(`kept in browser storage`);
     expect(readStorage(UNREADABLE_KEY)).toBeNull();
+    // The editor's autosaves on every change leave the only copy as it was.
+    restored.autosave(serializeSong(restored.song), serializeSong(restored.song));
     expect(readStorage(AUTOSAVE_KEY)).toBe(newer);
+    expect(readStorage(SAVED_KEY)).toBe("newer saved");
   });
 });
