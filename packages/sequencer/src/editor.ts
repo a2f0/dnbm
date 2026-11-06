@@ -3,6 +3,7 @@
 
 import type { Pattern, Song } from "@a2f0/dnbm-synth/song/model";
 import type { DnbmSequencerState } from "../../../src/control";
+import type { Autosave } from "./storage";
 import type { SongStore } from "./store";
 import type { Dialogs } from "./ui/dialog";
 import type { View } from "./view";
@@ -23,6 +24,8 @@ export interface Environment {
   readonly actions: boolean;
   /** Receives the app's state for its host whenever it may have changed. */
   readonly onState?: ((state: DnbmSequencerState) => void) | undefined;
+  /** Writes the song to browser storage (storage.ts), or nothing when that would lose one. */
+  readonly autosave: Autosave;
 }
 
 /** The editor's state and actions that its panels read and call. */
