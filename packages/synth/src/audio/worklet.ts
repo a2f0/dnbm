@@ -20,6 +20,8 @@ class EngineProcessor extends AudioWorkletProcessor {
   /** Messages that arrive while the module is still compiling. */
   private readonly pending: HostMessage[] = [];
   private serial = 0;
+  /** The last play or stop request taken, which every position report carries. */
+  private request = 0;
   private playing = false;
   private nextMeters = 0;
 
@@ -56,12 +58,14 @@ class EngineProcessor extends AudioWorkletProcessor {
           engine.loadSong(message.data);
           break;
         case "play":
+          this.request = message.request;
           engine.play(message.mode, message.index);
           break;
         case "cue":
           engine.cue(message.mode, message.index);
           break;
         case "stop":
+          this.request = message.request;
           engine.stop();
           this.report(engine);
           break;
@@ -85,6 +89,7 @@ class EngineProcessor extends AudioWorkletProcessor {
     this.playing = position.playing;
     this.send({
       type: "position",
+      request: this.request,
       slot: position.slot,
       pattern: position.pattern,
       step: position.step,
