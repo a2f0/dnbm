@@ -57,7 +57,11 @@ export async function renderWav({
   signal,
   onProgress,
 }: WavExport): Promise<RenderedWav | undefined> {
-  const wasm = await fetch(engine, { signal }).then((response) => response.arrayBuffer());
+  const wasm = await fetch(engine, { signal }).then((response) => {
+    // An error page is no engine: say what failed to load, as starting audio does.
+    if (!response.ok) throw new Error(`Couldn't load ${engine} (${response.status}).`);
+    return response.arrayBuffer();
+  });
   // Gone while the engine loaded: start no worker, which an abort that already
   // happened would never stop.
   if (signal.aborted) return undefined;
