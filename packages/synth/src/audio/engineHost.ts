@@ -20,6 +20,11 @@ export class EngineHost {
   onError: ((message: string) => void) | undefined;
   /** Once closed, every command does nothing. */
   private closed = false;
+  /**
+   * The last play or stop sent. The engine's position reports from before it took that
+   * one are stale: a stop's report arriving after the next play would say nothing plays.
+   */
+  private request = 0;
 
   private constructor(
     readonly context: AudioContext,
@@ -100,8 +105,9 @@ export class EngineHost {
   }
 
   private receive(message: ProcessorMessage): void {
-    if (message.type === "position") this.onPosition?.(message);
-    else if (message.type === "meters") this.onMeters?.(message.levels);
+    if (message.type === "position") {
+      if (message.request === this.request) this.onPosition?.(message);
+    } else if (message.type === "meters") this.onMeters?.(message.levels);
     else if (message.type === "error") this.onError?.(message.message);
   }
 
@@ -132,7 +138,7 @@ export class EngineHost {
 
   play(mode: PlayMode, index: number): void {
     this.resume();
-    this.send({ type: "play", mode, index });
+    this.send({ type: "play", mode, index, request: ++this.request });
   }
 
   cue(mode: PlayMode, index: number): void {
@@ -140,7 +146,7 @@ export class EngineHost {
   }
 
   stop(): void {
-    this.send({ type: "stop" });
+    this.send({ type: "stop", request: ++this.request });
   }
 
   trigger(track: number, velocity: number, note: number): void {
