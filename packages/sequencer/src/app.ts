@@ -8,7 +8,6 @@ import type { Pattern, Song, Track } from "@a2f0/dnbm-synth/song/model";
 import type { DnbmSequencerCommand } from "../../../src/control";
 import type { Editor, Environment } from "./editor";
 import { SongFiles } from "./songFiles";
-import { AUTOSAVE_KEY, SAVED_KEY, writeStorage } from "./storage";
 import { type ChangeSource, SongStore } from "./store";
 import { DevicePanel } from "./ui/device";
 import { Dialogs } from "./ui/dialog";
@@ -289,8 +288,7 @@ export class App implements Editor {
    */
   private autosave(): void {
     if (this.gone) return;
-    writeStorage(AUTOSAVE_KEY, serializeSong(this.song));
-    writeStorage(SAVED_KEY, this.store.saved);
+    this.environment.autosave(serializeSong(this.song), this.store.saved);
   }
 
   /** Starts the audio engine on first use; browsers only allow it after a gesture. */
