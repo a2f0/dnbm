@@ -148,6 +148,23 @@ commit audio binaries. A successful render, passing test or advancing player
 clock is not a listening verdict: leave audible acceptance pending when no one
 has listened. The loop runs on request; it does not schedule work or deploy.
 
+## State machines
+
+Make implicit state machines explicit when you write or change code: one closed
+state type (a discriminated union, enum, or sealed type) carrying each state's
+data, typed events, and one pure transition function, with effects run on
+entering a state and async work tagged so only the current request can finish.
+Follow the `explicit-state-machines` skill for what to convert, what to leave
+alone, and how to prove behavior did not change; `agent-tool state-machines`
+lists leads. Reviews flag new implicit machines.
+
+Here the tag is `status`, with a nested `phase` for a sub-machine. The player's
+transport (`packages/player/src/transport.ts`) is the model: a pure `transition`,
+unit-tested in `packages/player/test/`, with `Player.send` its only writer. Audio
+resume and suspend stay in the `Player` methods, since paused selection must never
+resume audio. Async replies carry a request number (`protocol.ts` position reports,
+`SongFiles` loads).
+
 ## Dependency updates
 
 Use the installed `update-dependencies` skill and read
