@@ -494,11 +494,11 @@ export class App implements Editor {
     // Drop a song file anywhere on the app to open it. A drop on an open dialog does
     // nothing, rather than letting the browser open the file in place of the page.
     root.addEventListener("dragover", (event) => event.preventDefault());
-    root.addEventListener("drop", async (event) => {
+    root.addEventListener("drop", (event) => {
       event.preventDefault();
       const file = (event as DragEvent).dataTransfer?.files[0];
       if (!file || root.querySelector("dialog[open]")) return;
-      if (await this.files.confirmDiscard()) this.files.openText(await file.text(), file.name);
+      void this.files.openDropped(file);
     });
   }
 }
