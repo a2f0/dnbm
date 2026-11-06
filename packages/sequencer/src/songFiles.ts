@@ -124,7 +124,16 @@ export class SongFiles {
   async openDropped(file: File): Promise<void> {
     const request = this.begin();
     if (!(await this.confirmDiscard()) || !this.current(request)) return;
-    const text = await file.text();
+    let text: string;
+    try {
+      // A dropped folder, or a file moved or unreadable since, fails to read.
+      text = await file.text();
+    } catch (error) {
+      if (!this.current(request)) return;
+      const message = error instanceof Error ? error.message : String(error);
+      this.host.say(`Couldn't open ${file.name}: ${message}`, true);
+      return;
+    }
     if (this.current(request)) this.openText(text, file.name);
   }
 
