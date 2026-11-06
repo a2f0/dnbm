@@ -117,7 +117,10 @@ bundle stays small, and the app's code loads only when an app mounts, once per p
 The sequencer autosaves the open song to the host page's local storage under
 `dnbm:song` and `dnbm:saved`, the keys earlier versions used, so a song autosaved by
 an earlier version on the same origin still opens. Every embed on that origin shares
-one autosaved song, and the host's pages can read it. The player stores nothing.
+one autosaved song, and the host's pages can read it. An autosave the mounting version
+can't read, such as one a newer version wrote, is copied to `dnbm:song:unreadable`
+before the sequencer starts from its example song and autosaves over `dnbm:song`, and
+the status bar says so. The player stores nothing.
 
 ### Content security policy and other origins
 
