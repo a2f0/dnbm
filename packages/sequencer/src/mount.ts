@@ -4,25 +4,12 @@
 // session's song, or the example song on a first visit, and returns the control the
 // host's commands go through.
 
-import { parseSong, parseSongText } from "@a2f0/dnbm-synth/song/format";
-import type { Song } from "@a2f0/dnbm-synth/song/model";
+import { parseSong } from "@a2f0/dnbm-synth/song/format";
 import undertow from "../../../songs/undertow.dnbm.json";
 import type { AppContext, AppControl } from "../../../src/shell";
 import { App } from "./app";
-import { AUTOSAVE_KEY, readStorage, SAVED_KEY } from "./storage";
+import { restoreSong } from "./storage";
 import { h } from "./ui/dom";
-
-function initialSong(): { song: Song; saved: string | undefined } {
-  const text = readStorage(AUTOSAVE_KEY);
-  if (text) {
-    try {
-      return { song: parseSongText(text), saved: readStorage(SAVED_KEY) ?? undefined };
-    } catch {
-      // An autosave from an older or broken session: start from the example instead.
-    }
-  }
-  return { song: parseSong(undertow), saved: undefined };
-}
 
 export function mount(
   root: ShadowRoot,
@@ -36,7 +23,8 @@ export function mount(
   const app = h("div", { class: "app" });
   frame.append(app);
   root.append(frame);
-  const { song, saved } = initialSong();
+  // The last session's song, or the example song on a first visit.
+  const { song, saved, autosave, problem } = restoreSong(() => parseSong(undertow));
   const editor = new App(app, song, saved, {
     frame,
     root,
@@ -45,6 +33,8 @@ export function mount(
     onTitle,
     actions: actions !== false,
     onState,
+    autosave,
   });
+  if (problem) editor.say(problem, true);
   return { run: (command) => editor.run(command) };
 }

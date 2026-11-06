@@ -46,14 +46,19 @@ export async function openSongFile(): Promise<OpenedFile | undefined> {
       if (!isRefused(error)) throw error;
     }
   }
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const input = Object.assign(document.createElement("input"), {
       type: "file",
       accept: ".json,application/json",
     });
-    input.addEventListener("change", async () => {
+    input.addEventListener("change", () => {
       const file = input.files?.[0];
-      resolve(file ? { text: await file.text(), name: file.name, handle: undefined } : undefined);
+      if (!file) {
+        resolve(undefined);
+        return;
+      }
+      // A file that can't be read rejects, so the caller reports it.
+      file.text().then((text) => resolve({ text, name: file.name, handle: undefined }), reject);
     });
     input.addEventListener("cancel", () => resolve(undefined));
     input.click();

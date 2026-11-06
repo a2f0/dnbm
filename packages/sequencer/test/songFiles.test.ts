@@ -30,8 +30,14 @@ function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
   return { promise, resolve };
 }
 
-function songFiles(): { files: SongFilesType; store: SongStore } {
+interface Said {
+  readonly message: string;
+  readonly error: boolean;
+}
+
+function songFiles(): { files: SongFilesType; store: SongStore; said: Said[] } {
   const store = new SongStore(newSong());
+  const said: Said[] = [];
   const view = {
     patternId: "a",
     trackId: "",
@@ -44,12 +50,52 @@ function songFiles(): { files: SongFilesType; store: SongStore } {
     dialogs: { confirm: async () => true } as unknown as Dialogs,
     signal: new AbortController().signal,
     asset: (path) => new URL(path, "http://dnbm.test/"),
-    say: () => {},
+    say: (message, error = false) => void said.push({ message, error }),
     render: () => {},
     stop: () => {},
     autosave: () => {},
   });
-  return { files, store };
+  return { files, store, said };
+}
+
+/** A file whose contents can't be read, as a dropped folder's can't. */
+function unreadableFile(name: string): File {
+  return {
+    name,
+    text: () =>
+      Promise.reject(new DOMException("A requested file could not be found.", "NotFoundError")),
+  } as unknown as File;
+}
+
+/**
+ * Replaces `document` while `run` runs, so the file input that `openSongFile` falls back
+ * to picks `file` when clicked.
+ */
+async function withPickedFile(file: File, run: () => Promise<void>): Promise<void> {
+  const had = "document" in scope;
+  const original = scope["document"];
+  scope["document"] = {
+    createElement: () => {
+      const input = new EventTarget() as EventTarget & { files: File[]; click(): void };
+      input.files = [file];
+      input.click = () => queueMicrotask(() => input.dispatchEvent(new Event("change")));
+      return input;
+    },
+  };
+  try {
+    await run();
+  } finally {
+    if (had) scope["document"] = original;
+    else delete scope["document"];
+  }
+}
+
+/** Settles `promise`, or says it is still pending after a while. */
+async function settles(promise: Promise<void>): Promise<"settled" | "pending"> {
+  return Promise.race([
+    promise.then(() => "settled" as const),
+    Bun.sleep(200).then(() => "pending" as const),
+  ]);
 }
 
 /** Replaces `fetch` while `run` runs, with a response that waits for `body`. */
@@ -139,5 +185,27 @@ describe("song files", () => {
     await saving;
     expect(store.song.title).not.toBe("First");
     expect(files.fileName()).not.toBe("first.dnbm.json");
+  });
+
+  test("a dropped file that can't be read is reported and replaces nothing", async () => {
+    const { files, store, said } = songFiles();
+    const before = serializeSong(store.song);
+    await files.openDropped(unreadableFile("folder"));
+    expect(serializeSong(store.song)).toBe(before);
+    expect(said).toEqual([
+      { message: "Couldn't open folder: A requested file could not be found.", error: true },
+    ]);
+  });
+
+  test("a picked file that can't be read is reported instead of waiting forever", async () => {
+    const { files, store, said } = songFiles();
+    const before = serializeSong(store.song);
+    await withPickedFile(unreadableFile("gone.dnbm.json"), async () => {
+      expect(await settles(files.open())).toBe("settled");
+    });
+    expect(serializeSong(store.song)).toBe(before);
+    expect(said).toEqual([
+      { message: "Couldn't open: A requested file could not be found.", error: true },
+    ]);
   });
 });
