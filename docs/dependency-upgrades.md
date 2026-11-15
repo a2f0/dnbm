@@ -16,6 +16,12 @@ therefore does not show that an older runtime generated it. Let the pinned Bun
 its hash. Never hand-edit the format number. Recheck this behavior when changing
 Bun or introducing another nested override.
 
+`mise.lock` records each `.mise.toml` tool's URL and checksum per platform, and
+CI's mise-action installs from it in locked mode. Regenerate it with `mise lock`
+whenever `.mise.toml` changes, and commit both together. Every workflow's
+mise-action `version` must read the lockfile's format (format 4 needs mise
+2026.11.1 or later), so raise those pins before the lock's format moves.
+
 ## Audit and validation
 
 Run `bun audit` against the baseline and final lockfiles; CI also audits
