@@ -33,7 +33,11 @@ playwright-core's list (`chromiumSwitches`). `scripts/testing/chrome.test.ts` fa
 when a playwright-core upgrade changes that list; copy the new one. The extra
 `UnexportableKeyDeletion` stops Chrome on macOS from spending about five seconds in
 the keychain after each context closes. If a Chrome update renames it, closing slows
-down again and `closeChrome` warns that it killed Chrome.
+down again and `closeChrome` warns that it killed Chrome. The extra
+`HttpsFirstBalancedModeAutoEnable` keeps Chrome 157+ from upgrading `http://`
+navigations to public hosts to `https://`, which the site tracking test's
+`http://dnbm.a2f0.net` case needs. If a Chrome update renames it, that test fails
+with `ERR_BLOCKED_BY_CLIENT`.
 
 ## Deployment compatibility
 
