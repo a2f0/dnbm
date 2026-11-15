@@ -29,7 +29,7 @@ jobs:
       - name: Set up Bun, Node and ShellCheck
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          version: 2026.11.0
+          version: 2026.11.8
           install_args: bun node shellcheck
           cache: true
 
@@ -103,7 +103,7 @@ jobs:
       - name: Set up Bun, Node and wasm-opt
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          version: 2026.11.0
+          version: 2026.11.8
           install_args: bun node aqua:WebAssembly/binaryen
           cache: true
 
@@ -135,7 +135,7 @@ jobs:
       - name: Set up Bun
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          version: 2026.11.0
+          version: 2026.11.8
           install_args: bun
           cache: true
 
@@ -173,7 +173,7 @@ jobs:
       - name: Set up Bun, Node and wasm-opt
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          version: 2026.11.0
+          version: 2026.11.8
           install_args: bun node aqua:WebAssembly/binaryen
           cache: true
 
