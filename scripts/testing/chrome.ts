@@ -35,8 +35,16 @@ export const PLAYWRIGHT_DISABLED_FEATURES = [
  * an off-the-record profile, which every Playwright context is, goes away: a keychain
  * query through the Secure Enclave that took about 5 s each, one at a time, and Chrome
  * won't exit while one runs. These pages never make such keys.
+ *
+ * Chrome 157 turns on HTTPS-First balanced mode by default, which upgrades every
+ * navigation to an `http://` public host to `https://` despite `HttpsUpgrades` being
+ * off, so pages the suites open on such origins would load from another origin.
  */
-export const DISABLED_FEATURES = [...PLAYWRIGHT_DISABLED_FEATURES, "UnexportableKeyDeletion"];
+export const DISABLED_FEATURES = [
+  ...PLAYWRIGHT_DISABLED_FEATURES,
+  "UnexportableKeyDeletion",
+  "HttpsFirstBalancedModeAutoEnable",
+];
 
 /** Launching took 0.3-0.7 s with the host's load average at 15-40. */
 export const LAUNCH_TIMEOUT = 30_000;
