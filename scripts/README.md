@@ -10,7 +10,7 @@ Use the stable package scripts from the repository root. See
 | `songs/`     | Canonical song checking/formatting and offline WAV rendering: `songs:check`, `songs:fmt`, `render`.          |
 | `fidelity/`  | Reproducible audio checkpoints and RMS-matched local audition pages: `fidelity:capture`, `fidelity:compare`. |
 | `checks/`    | Repository lint/policy checks and fixtures.                                                                  |
-| `git/hooks/` | Tracked hook bodies; installation and drift checks use agent-tool.                                           |
+| `git/hooks/` | Tracked hook bodies; `pre-push` is agent-tool's generated push gate. Installation and drift use agent-tool.  |
 | `testing/`   | The full validation run-group plan used by `check`, and the Chrome every browser suite launches.             |
 
 Update imports, relative root resolution, package commands, CI, hooks, tests, and

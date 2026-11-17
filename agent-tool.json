@@ -107,5 +107,37 @@
         "executable": true
       }
     ]
+  },
+  "pushGate": {
+    "steps": [
+      { "label": "shellcheck", "command": ["bun", "run", "lint:scripts"] },
+      { "label": "biome", "command": ["bun", "run", "lint"] },
+      { "label": "songs", "command": ["bun", "run", "songs:check"] },
+      { "label": "types", "command": ["bun", "run", "typecheck"] },
+      {
+        "label": "rustfmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--manifest-path",
+          "packages/synth/engine/Cargo.toml",
+          "--check"
+        ]
+      },
+      {
+        "label": "clippy",
+        "command": [
+          "cargo",
+          "clippy",
+          "--manifest-path",
+          "packages/synth/engine/Cargo.toml",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      }
+    ],
+    "budgetSeconds": 60
   }
 }
