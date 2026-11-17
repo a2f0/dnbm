@@ -100,7 +100,7 @@ changes, which commands are available) and tells subscribers when it changes, an
 ## Development
 
 ```sh
-bun run check   # everything CI checks; the pre-push hook runs it too; needs Google Chrome
+bun run check   # everything CI checks; needs Google Chrome
 bun run test    # build the engine, then the TypeScript tests
 bun run engine:check   # rustfmt, clippy and cargo test
 bun run fix     # format TypeScript, Rust and songs
