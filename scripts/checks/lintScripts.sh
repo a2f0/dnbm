@@ -10,6 +10,10 @@ command -v shellcheck >/dev/null 2>&1 || {
   exit 1
 }
 
+# Git hooks can export an index or worktree that overrides the directory above.
+git_variables=$(git rev-parse --local-env-vars)
+for name in $git_variables; do unset "$name"; done
+
 # Tracked and untracked-but-not-ignored scripts, including the git hooks.
 git ls-files --cached --others --exclude-standard -z -- '*.sh' 'scripts/git/hooks/*' |
   xargs -0 shellcheck -x

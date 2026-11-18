@@ -33,7 +33,7 @@ test("shell lint scans this checkout when launched from a different repository",
         [relative(cwd, join(root, "scripts/checks/lintScripts.sh"))],
         {
           cwd,
-          env,
+          env: { ...env, GIT_DIR: join(caller, ".git"), GIT_WORK_TREE: caller },
           encoding: "utf8",
         },
       ).split("\n");
