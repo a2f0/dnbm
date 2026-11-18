@@ -67,6 +67,16 @@ test("shell lint scans this checkout when launched from a different repository",
       encoding: "utf8",
     });
     expect(linked.split("\n")).toContain("scripts/checks/lintScripts.sh");
+    const copy = join(caller, "copy/scripts/checks");
+    mkdirSync(copy, { recursive: true });
+    copyFileSync(join(root, "scripts/checks/lintScripts.sh"), join(copy, "lintScripts.sh"));
+    const misplaced = spawnSync("sh", [join(copy, "lintScripts.sh")], {
+      cwd: caller,
+      env,
+      encoding: "utf8",
+    });
+    expect(misplaced.status).toBe(1);
+    expect(misplaced.stderr).toContain("Shell lint requires its own Git checkout.");
     // A partial Git listing must never reach ShellCheck.
     const realGit = Bun.which("git");
     expect(realGit).toBeTruthy();
@@ -82,12 +92,6 @@ test("shell lint scans this checkout when launched from a different repository",
     });
     expect(failed.status).toBe(17);
     expect(failed.stdout).toBe("");
-    const copy = join(caller, "copy/scripts/checks");
-    mkdirSync(copy, { recursive: true });
-    copyFileSync(join(root, "scripts/checks/lintScripts.sh"), join(copy, "lintScripts.sh"));
-    expect(spawnSync("sh", [join(copy, "lintScripts.sh")], { cwd: caller, env }).status).not.toBe(
-      0,
-    );
   } finally {
     rmSync(caller, { recursive: true, force: true });
   }
