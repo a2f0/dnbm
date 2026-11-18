@@ -24,6 +24,8 @@ test("shell lint scans this checkout when launched from a different repository",
   env["PATH"] = caller + ":" + process.env["PATH"];
   try {
     execFileSync("git", ["init", "--quiet", caller], { env });
+    writeFileSync(join(caller, "caller-only.sh"), "#!/bin/sh\n");
+    execFileSync("git", ["add", "caller-only.sh"], { cwd: caller, env });
     writeFileSync(join(caller, "shellcheck"), '#!/bin/sh\npwd -P\nprintf "%s\\n" "$@"\n', {
       mode: 0o755,
     });
@@ -33,10 +35,16 @@ test("shell lint scans this checkout when launched from a different repository",
         [relative(cwd, join(root, "scripts/checks/lintScripts.sh"))],
         {
           cwd,
-          env: { ...env, GIT_DIR: join(caller, ".git"), GIT_WORK_TREE: caller },
+          env: {
+            ...env,
+            GIT_DIR: join(caller, ".git"),
+            GIT_WORK_TREE: caller,
+            GIT_INDEX_FILE: join(caller, ".git/index"),
+          },
           encoding: "utf8",
         },
       ).split("\n");
+      expect(output).not.toContain("caller-only.sh");
       expect(output).toContain(root);
       expect(output).toContain("scripts/checks/lintScripts.sh");
     }
