@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
@@ -40,6 +40,12 @@ test("shell lint scans this checkout when launched from a different repository",
       expect(output).toContain(root);
       expect(output).toContain("scripts/checks/lintScripts.sh");
     }
+    const copy = join(caller, "copy/scripts/checks");
+    mkdirSync(copy, { recursive: true });
+    copyFileSync(join(root, "scripts/checks/lintScripts.sh"), join(copy, "lintScripts.sh"));
+    expect(spawnSync("sh", [join(copy, "lintScripts.sh")], { cwd: caller, env }).status).not.toBe(
+      0,
+    );
   } finally {
     rmSync(caller, { recursive: true, force: true });
   }

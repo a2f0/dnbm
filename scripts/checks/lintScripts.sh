@@ -15,5 +15,7 @@ git_variables=$(git rev-parse --local-env-vars)
 for name in $git_variables; do unset "$name"; done
 
 # Tracked and untracked-but-not-ignored scripts, including the git hooks.
-git ls-files --cached --others --exclude-standard -z -- '*.sh' 'scripts/git/hooks/*' |
-  xargs -0 shellcheck -x
+files=$(mktemp)
+trap 'rm -f "$files"' EXIT
+git --git-dir=.git --work-tree=. ls-files --cached --others --exclude-standard -z -- '*.sh' 'scripts/git/hooks/*' > "$files"
+xargs -0 shellcheck -x < "$files"
