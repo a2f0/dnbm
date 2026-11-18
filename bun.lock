@@ -5,7 +5,7 @@
     "": {
       "name": "@a2f0/dnbm",
       "devDependencies": {
-        "@a2f0/agent-tool": "0.1.62",
+        "@a2f0/agent-tool": "0.1.65",
         "@a2f0/ct-client": "0.1.7",
         "@a2f0/dnbm-synth": "workspace:*",
         "@biomejs/biome": "2.6.4",
@@ -36,7 +36,7 @@
     },
   },
   "packages": {
-    "@a2f0/agent-tool": ["@a2f0/agent-tool@0.1.62", "", { "dependencies": { "@resvg/resvg-wasm": "2.6.2" }, "bin": { "agent-tool": "src/index.ts" } }, "sha512-xhNT54KGImMQXueuyin7Xpowxf98mn1iRz7pIF8vyO0C4OwU2sgYvzoMzI90R1rC68ZVivupUWk4Wq2AVrtpMQ=="],
+    "@a2f0/agent-tool": ["@a2f0/agent-tool@0.1.65", "", { "dependencies": { "@resvg/resvg-wasm": "2.6.2" }, "bin": { "agent-tool": "src/index.ts" } }, "sha512-yUdUOgsHOowZfzBQTTrampqWy0oH5o99NSrWOSloHv9vakp81GZY+o5b/ERoiTugHMAFBVhTXvg/TI0O5F21Lw=="],
 
     "@a2f0/ct-client": ["@a2f0/ct-client@0.1.7", "", {}, "sha512-43oR0r9whel+A+zfKDMb+8zHZRfl+XR4OjN9wCGDXoiRFkkui/XsMHc34lHck+mwX3IEekgHO5cw4lw7okLa1g=="],
 
