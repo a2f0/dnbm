@@ -14,8 +14,12 @@ command -v shellcheck >/dev/null 2>&1 || {
 git_variables=$(git rev-parse --local-env-vars)
 for name in $git_variables; do unset "$name"; done
 
+checkout=$(pwd -P)
+root=$(git rev-parse --show-toplevel)
+[ "$root" = "$checkout" ] || { echo "Shell lint requires its own Git checkout." >&2; exit 1; }
+
 # Tracked and untracked-but-not-ignored scripts, including the git hooks.
 files=$(mktemp)
 trap 'rm -f "$files"' EXIT
-git --git-dir=.git --work-tree=. ls-files --cached --others --exclude-standard -z -- '*.sh' 'scripts/git/hooks/*' > "$files"
+git ls-files --cached --others --exclude-standard -z -- '*.sh' 'scripts/git/hooks/*' > "$files"
 xargs -0 shellcheck -x < "$files"

@@ -21,6 +21,8 @@ test("shell lint scans this checkout when launched from a different repository",
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
   );
+  env["GIT_CONFIG_GLOBAL"] = "/dev/null";
+  env["GIT_CONFIG_NOSYSTEM"] = "1";
   env["PATH"] = caller + ":" + process.env["PATH"];
   try {
     execFileSync("git", ["init", "--quiet", caller], { env });
