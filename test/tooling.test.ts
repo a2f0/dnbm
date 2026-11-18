@@ -1,6 +1,16 @@
 import { expect, test } from "bun:test";
-import { execFileSync } from "node:child_process";
-import { join } from "node:path";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
 
 // Check native API compatibility through Miniflare's actual Sharp resolution.
 // Advisory audits separately verify that the selected version includes the fix.
@@ -12,3 +22,77 @@ test("Wrangler's local Images binding decodes SVG and transforms it through Shar
   });
   expect(JSON.parse(result.trim())).toEqual({ width: 8, height: 6, channels: 3 });
 }, 35_000);
+
+test("shell lint scans this checkout when launched from a different repository", () => {
+  const caller = realpathSync(mkdtempSync(join(tmpdir(), "lint caller ")));
+  const root = realpathSync(join(import.meta.dir, ".."));
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+  );
+  env["GIT_CONFIG_GLOBAL"] = "/dev/null";
+  env["GIT_CONFIG_NOSYSTEM"] = "1";
+  env["PATH"] = caller + ":" + process.env["PATH"];
+  try {
+    execFileSync("git", ["init", "--quiet", caller], { env });
+    writeFileSync(join(caller, "caller-only.sh"), "#!/bin/sh\n");
+    execFileSync("git", ["add", "caller-only.sh"], { cwd: caller, env });
+    writeFileSync(join(caller, "shellcheck"), '#!/bin/sh\npwd -P\nprintf "%s\\n" "$@"\n', {
+      mode: 0o755,
+    });
+    for (const cwd of [root, caller]) {
+      const output = execFileSync(
+        "sh",
+        [relative(cwd, join(root, "scripts/checks/lintScripts.sh"))],
+        {
+          cwd,
+          env: {
+            ...env,
+            GIT_DIR: join(caller, ".git"),
+            GIT_WORK_TREE: caller,
+            GIT_INDEX_FILE: join(caller, ".git/index"),
+          },
+          encoding: "utf8",
+        },
+      ).split("\n");
+      expect(output).not.toContain("caller-only.sh");
+      expect(output).toContain(root);
+      expect(output).toContain("scripts/checks/lintScripts.sh");
+    }
+    // A symlink to a nested caller leaves a logical PWD whose parent differs
+    // from the physical directory the kernel uses to open the relative script.
+    symlinkSync(join(root, "scripts"), join(caller, "nested"), "dir");
+    const linked = execFileSync("sh", ["-c", "cd nested && sh ../scripts/checks/lintScripts.sh"], {
+      cwd: caller,
+      env,
+      encoding: "utf8",
+    });
+    expect(linked.split("\n")).toContain("scripts/checks/lintScripts.sh");
+    const copy = join(caller, "copy/scripts/checks");
+    mkdirSync(copy, { recursive: true });
+    copyFileSync(join(root, "scripts/checks/lintScripts.sh"), join(copy, "lintScripts.sh"));
+    const misplaced = spawnSync("sh", [join(copy, "lintScripts.sh")], {
+      cwd: caller,
+      env,
+      encoding: "utf8",
+    });
+    expect(misplaced.status).toBe(1);
+    expect(misplaced.stderr).toContain("Shell lint requires its own Git checkout.");
+    // A partial Git listing must never reach ShellCheck.
+    const realGit = Bun.which("git");
+    expect(realGit).toBeTruthy();
+    writeFileSync(
+      join(caller, "git"),
+      '#!/bin/sh\nif [ "$1" = ls-files ]; then printf "partial.sh\\0"; exit 17; fi\nexec "$REAL_GIT" "$@"\n',
+      { mode: 0o755 },
+    );
+    const failed = spawnSync("sh", [join(root, "scripts/checks/lintScripts.sh")], {
+      cwd: caller,
+      env: { ...env, REAL_GIT: realGit ?? "" },
+      encoding: "utf8",
+    });
+    expect(failed.status).toBe(17);
+    expect(failed.stdout).toBe("");
+  } finally {
+    rmSync(caller, { recursive: true, force: true });
+  }
+});
