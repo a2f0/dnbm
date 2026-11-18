@@ -18,8 +18,12 @@ test("Wrangler's local Images binding decodes SVG and transforms it through Shar
 test("shell lint scans this checkout when launched from a different repository", () => {
   const caller = realpathSync(mkdtempSync(join(tmpdir(), "lint caller ")));
   const root = realpathSync(join(import.meta.dir, ".."));
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+  );
+  env["PATH"] = caller + ":" + process.env["PATH"];
   try {
-    execFileSync("git", ["init", "--quiet", caller]);
+    execFileSync("git", ["init", "--quiet", caller], { env });
     writeFileSync(join(caller, "shellcheck"), '#!/bin/sh\npwd -P\nprintf "%s\\n" "$@"\n', {
       mode: 0o755,
     });
@@ -29,7 +33,7 @@ test("shell lint scans this checkout when launched from a different repository",
         [relative(cwd, join(root, "scripts/checks/lintScripts.sh"))],
         {
           cwd,
-          env: { ...process.env, PATH: caller + ":" + process.env.PATH },
+          env,
           encoding: "utf8",
         },
       ).split("\n");
