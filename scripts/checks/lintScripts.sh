@@ -3,7 +3,7 @@ set -eu
 
 # Lint every shell script in the repo (including git hooks) with ShellCheck.
 
-CDPATH='' cd -- "$(dirname -- "$0")/../.."
+CDPATH='' cd -P -- "$(dirname -- "$0")/../.."
 
 command -v shellcheck >/dev/null 2>&1 || {
   echo "Error: shellcheck is required (mise install, or brew install shellcheck)." >&2

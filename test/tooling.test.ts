@@ -1,6 +1,14 @@
 import { expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
@@ -50,6 +58,15 @@ test("shell lint scans this checkout when launched from a different repository",
       expect(output).toContain(root);
       expect(output).toContain("scripts/checks/lintScripts.sh");
     }
+    // A symlink to a nested caller leaves a logical PWD whose parent differs
+    // from the physical directory the kernel uses to open the relative script.
+    symlinkSync(join(root, "scripts"), join(caller, "nested"), "dir");
+    const linked = execFileSync("sh", ["-c", "cd nested && sh ../scripts/checks/lintScripts.sh"], {
+      cwd: caller,
+      env,
+      encoding: "utf8",
+    });
+    expect(linked.split("\n")).toContain("scripts/checks/lintScripts.sh");
     const copy = join(caller, "copy/scripts/checks");
     mkdirSync(copy, { recursive: true });
     copyFileSync(join(root, "scripts/checks/lintScripts.sh"), join(copy, "lintScripts.sh"));
