@@ -67,6 +67,21 @@ test("shell lint scans this checkout when launched from a different repository",
       encoding: "utf8",
     });
     expect(linked.split("\n")).toContain("scripts/checks/lintScripts.sh");
+    // A partial Git listing must never reach ShellCheck.
+    const realGit = Bun.which("git");
+    expect(realGit).toBeTruthy();
+    writeFileSync(
+      join(caller, "git"),
+      '#!/bin/sh\nif [ "$1" = ls-files ]; then printf "partial.sh\\0"; exit 17; fi\nexec "$REAL_GIT" "$@"\n',
+      { mode: 0o755 },
+    );
+    const failed = spawnSync("sh", [join(root, "scripts/checks/lintScripts.sh")], {
+      cwd: caller,
+      env: { ...env, REAL_GIT: realGit ?? "" },
+      encoding: "utf8",
+    });
+    expect(failed.status).toBe(17);
+    expect(failed.stdout).toBe("");
     const copy = join(caller, "copy/scripts/checks");
     mkdirSync(copy, { recursive: true });
     copyFileSync(join(root, "scripts/checks/lintScripts.sh"), join(copy, "lintScripts.sh"));
