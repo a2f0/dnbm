@@ -88,7 +88,7 @@ not an unrelated synthesizer. Keep the probes with their reports.
    pause/resume, stop, next/previous, seek, shuffle/repeat, and mobile-width
    overflow; check console/worklet errors and teardown. A clock advancing is
    transport evidence, not proof of good sound. Capture UI screenshots only
-   through matrix's take-screenshots skill; audio evidence stays in .fidelity.
+   through the managed take-screenshots skill; audio evidence stays in .fidelity.
 5. Run relevant Rust/audio/composition tests, then bun run check. Check finite,
    bounded output, rate/block-size parity for changed paths and real-time cost.
    Don't weaken safety checks or normalize raw evidence to hide a regression.
