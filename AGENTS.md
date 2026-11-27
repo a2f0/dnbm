@@ -185,9 +185,9 @@ PR and `ship-pr` to ship one end to end (independent review, repairs, merge, cle
 Run them with `bun run agent-tool ...`. Do not edit the managed skill copies in
 `.agents/skills` and `.claude/skills`, or the harness permission rules that
 `agent-tool permissions install --apply` generates (`.claude/settings.json`,
-`.codex/rules/agent-tool.rules`, `.gemini/policies/agent-tool.toml` and
-`.agent-tool-permissions.json`); classify the executables agents run through
-`bun run agent-tool bun x` in `permissions.executables` of `agent-tool.json` instead.
+`.codex/rules/agent-tool.rules` and `.agent-tool-permissions.json`); classify the
+executables agents run through `bun run agent-tool bun x` in `permissions.executables`
+of `agent-tool.json` instead.
 After upgrading the dependency or changing that section, run `bun run agents:sync` and
 commit the dependency, lockfile, skills, `.agent-tool-skills.json` and the permission
 files together; `bun run agents:check` checks both. The required check is `CI gate`
